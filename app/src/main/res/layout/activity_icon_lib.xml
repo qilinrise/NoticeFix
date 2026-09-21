@@ -2,62 +2,66 @@
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:fitsSystemWindows="true"
     tools:context=".activity.IconLibActivity">
+
+    <!-- 顶栏：已开启 fitsSystemWindows 状态栏避让 -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        app:elevation="0dp"
         android:paddingStart="3dp"
-        android:paddingEnd="8dp"
-        >
+        android:paddingEnd="8dp">
+
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar1"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            />
+            android:layout_height="?attr/actionBarSize" />
 
     </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- 图标库统计栏 -->
     <LinearLayout
-        android:padding="5dp"
-        android:theme="@android:style/ThemeOverlay.Material.Dark"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
+
         <TextView
-            android:paddingStart="10dp"
-            android:paddingEnd="0dp"
+            android:paddingStart="0dp"
+            android:paddingEnd="4dp"
             android:textColor="@android:color/holo_blue_dark"
+            android:textSize="13sp"
             android:text="@string/app_lib_count"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"/>
+            android:layout_height="wrap_content" />
+
         <TextView
-            android:text='--'
+            android:text="--"
             android:textColor="@android:color/holo_blue_dark"
+            android:textSize="13sp"
             android:id="@+id/lib_icon_app_count"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"/>
+            android:layout_height="wrap_content" />
+
     </LinearLayout>
 
+    <!-- 图标库列表：权重撑满剩余区域，防止底部手势栏截断 -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/appListView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:scrollbars="vertical"
         android:fadeScrollbars="true"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
-
-    <!--<ScrollView
-        android:id="@+id/app_list"
-        android:layout_width="match_parent"
-        android:layout_height="677dp"
-        android:orientation="vertical">
-
-
-
-
-
-    </ScrollView>-->
+        android:clipToPadding="false"
+        android:paddingBottom="16dp" />
 
 </LinearLayout>
