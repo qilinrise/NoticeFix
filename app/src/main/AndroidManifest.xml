@@ -6,7 +6,7 @@
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <!--    请求通知权限-->
+    <!-- 请求通知权限 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission
@@ -14,7 +14,7 @@
         tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!--测试申请midi设备-->
+    <!-- 测试申请midi设备 -->
     <uses-feature android:name="android.software.midi" android:required="true"/>
 
     <application
@@ -28,6 +28,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         tools:targetApi="31">
+        
         <activity
             android:name=".activity.IconLibActivity"
             android:exported="false"
@@ -51,6 +52,7 @@
                 android:name="android.app.lib_name"
                 android:value="" />
         </activity>
+        
         <activity
             android:name=".activity.SettingsActivity"
             android:exported="false"
@@ -59,7 +61,8 @@
             <meta-data
                 android:name="android.app.lib_name"
                 android:value="" />
-        </activity> <!-- android:theme="@style/Theme.NoticeFix" -->
+        </activity>
+        
         <activity
             android:name=".activity.AppListActivity"
             android:exported="false"
@@ -69,6 +72,8 @@
                 android:name="android.app.lib_name"
                 android:value="" />
         </activity>
+        
+        <!-- 主界面：已移除桌面启动图标，保留 LSPosed 模块直接调起入口 -->
         <activity
             android:name=".activity.MainActivity"
             android:exported="true"
@@ -76,8 +81,8 @@
             android:theme="@style/Theme.NoticeFix.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
+                <!-- Xposed / LSPosed 专属设置界面标记 -->
+                <category android:name="de.robv.android.xposed.category.MODULE_SETTINGS" />
             </intent-filter>
 
             <meta-data
