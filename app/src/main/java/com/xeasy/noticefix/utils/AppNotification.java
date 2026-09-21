@@ -13,7 +13,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 
-import androidx.annotation.RequiresApi;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
@@ -21,94 +20,66 @@ import com.xeasy.noticefix.R;
 import com.xeasy.noticefix.activity.MainActivity;
 
 /**
- * Author：SkySmile
- * Date：2019/2/28
- * Description：App的通知渠道配置
+ * App的通知渠道配置与发送
  */
-//@TargetApi(Build.VERSION_CODES.S)
 @SuppressWarnings("unused")
 public class AppNotification {
-    //通知ID
-    //对于通知来说ID相同即为同一条通知，如果通知ID已存在，则更新通知内容，否则发送一条新的通知
-    //这里为了每次都能发送一条新的通知，对ID进行累加
     private static int id = 1;
 
-    //影视类通知渠道
-    public final static String mediaChannelId = "chat"; //通知渠道ID
-    public final static String mediaChannelName = "聊天"; //通知渠道名称，显示在手机上该APP的通知管理中
-    public final static int mediaChannelImportance = NotificationManager.IMPORTANCE_HIGH; //通知渠道重要性
+    public final static String mediaChannelId = "chat";
+    public final static String mediaChannelName = "聊天";
+    public final static int mediaChannelImportance = NotificationManager.IMPORTANCE_HIGH;
 
-    //美食类通知渠道
-    public final static String foodChannelId = "0x2"; //通知渠道ID
-    public final static String foodChannelName = "美食"; //通知渠道名称，显示在手机上该APP的通知管理中
-    public final static int foodChannelImportance = NotificationManager.IMPORTANCE_DEFAULT; //通知渠道重要性
+    public final static String foodChannelId = "0x2";
+    public final static String foodChannelName = "美食";
+    public final static int foodChannelImportance = NotificationManager.IMPORTANCE_DEFAULT;
 
-    /**
-     * 创建通知渠道
-     *
-     * @param applicationContext  上下文
-     * @param channelId           渠道ID
-     * @param channelIdName       渠道名称，显示在手机上该APP的通知管理中
-     * @param channelIdImportance 渠道重要程度
-     */
     public static void createNotificationChannel(Context applicationContext, String channelId,
                                                  String channelIdName, int channelIdImportance) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager notificationManager = (NotificationManager) applicationContext.getSystemService(
                     Context.NOTIFICATION_SERVICE);
-            NotificationChannel notificationChannel = new NotificationChannel(channelId, channelIdName,
-                    channelIdImportance);
-            notificationManager.createNotificationChannel(notificationChannel);
+            if (notificationManager != null && notificationManager.getNotificationChannel(channelId) == null) {
+                NotificationChannel notificationChannel = new NotificationChannel(channelId, channelIdName,
+                        channelIdImportance);
+                notificationManager.createNotificationChannel(notificationChannel);
+            }
         }
     }
 
-    /**
-     * 发送通知，根据需要进行扩展
-     *
-     * @param context   上下文
-     * @param channelId 渠道ID（必须对应已创建的渠道ID）
-     * @param title     通知标题
-     * @param text      通知内容
-     * @param smallIcon 通知小图标（显示在状态栏中的）,必须设置
-     * @param largeIcon 通知大图标（下拉状态栏可见，显示在通知栏中），
-     *                  注意：这里的图片ID不能是mipmap文件夹下的，因为BitmapFactory.decodeResource方法只能
-     *                  获取到 drawable, sound, and raw resources;
-     * @param pi        点击通知打开的页面
-     */
     public static void sendNotification(Context context, String channelId, String title,
                                         String text, int smallIcon, int largeIcon, PendingIntent pi) {
-        Notification initNotice = initNotice(context, channelId, title,
-                text, smallIcon, largeIcon, pi);
+        Notification initNotice = initNotice(context, channelId, title, text, smallIcon, largeIcon, pi);
         NotificationManager notificationManager = (NotificationManager) context.getSystemService(
                 Context.NOTIFICATION_SERVICE);
-//        notificationManager.notify(id++, notification);
-        notificationManager.notify(id++, initNotice);
+        if (notificationManager != null) {
+            notificationManager.notify(id++, initNotice);
+        }
     }
-
 
     public static void sendFlashNoticeMessage(Context context, String pkgName){
-        // 发送特殊通知 告诉系统刷新所有通知
         Intent intent = new Intent(context, MainActivity.class);
         PendingIntent pi;
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             pi = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_IMMUTABLE);
         } else {
-            pi = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_ONE_SHOT);
+            pi = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
         }
         String contextString = pkgName == null ? "null" : pkgName;
+
+        // 使用系统原生矢量通知图标，大图标置为 0 保持纯粹通知栏风格
         Notification notification = AppNotification.initNotice(context, AppNotification.mediaChannelId,
-                "easy-reset", contextString, R.mipmap.head, R.mipmap.head, pi);
+                "easy-reset", contextString, R.drawable.ic_notification, 0, pi);
+
         NotificationManager notificationManager = (NotificationManager) context.getSystemService(
                 Context.NOTIFICATION_SERVICE);
-//        notificationManager.notify(id++, notification);
-        notificationManager.notify(19960324, notification);
-
+        if (notificationManager != null) {
+            notificationManager.notify(19960324, notification);
+        }
     }
 
-
-    public static Notification initNotice( Context context, String channelId, String title,
-                                           String text, int smallIcon, int largeIcon, PendingIntent pi ) {
-        //判断通知是否开启
+    public static Notification initNotice(Context context, String channelId, String title,
+                                           String text, int smallIcon, int largeIcon, PendingIntent pi) {
         if (!isNotificationEnabled(context)) {
             AlertDialog.Builder builder = new AlertDialog.Builder(context);
             builder.setTitle("提示");
@@ -117,65 +88,55 @@ public class AppNotification {
             builder.setNegativeButton("取消", null);
             builder.show();
         }
-        //判断某个渠道的通知是否开启
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (!isNotificationChannelEnabled(context, channelId)) {
                 String message = "";
-                if ( channelId.equals(mediaChannelId)) {
+                if (channelId.equals(mediaChannelId)) {
                     message = mediaChannelName;
                 }
-                if ( channelId.equals(foodChannelId)) {
+                if (channelId.equals(foodChannelId)) {
                     message = foodChannelName;
                 }
-                // 创建通知渠道
-                createNotificationChannel(context, channelId, message, NotificationManager.IMPORTANCE_HIGH );
-
-                AlertDialog.Builder builder = new AlertDialog.Builder(context);
-                builder.setTitle("提示");
-                builder.setMessage("是否开启"+message+"通知？");
-                builder.setPositiveButton("确定", (dialogInterface, i) -> openNotificationChannel(context, channelId));
-                builder.setNegativeButton("取消", null);
-                builder.show();
+                createNotificationChannel(context, channelId, message, NotificationManager.IMPORTANCE_HIGH);
             }
         }
-        //发送通知
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId);
         builder.setContentTitle(title);
         builder.setContentText(text);
         builder.setWhen(System.currentTimeMillis());
-        builder.setSmallIcon(smallIcon);
-        builder.setLargeIcon(BitmapFactory.decodeResource(context.getResources(), largeIcon));
+        builder.setSmallIcon(smallIcon != 0 ? smallIcon : R.drawable.ic_notification);
+
+        if (largeIcon != 0) {
+            try {
+                builder.setLargeIcon(BitmapFactory.decodeResource(context.getResources(), largeIcon));
+            } catch (Exception ignored) {
+            }
+        }
+
         builder.setContentIntent(pi);
         builder.setAutoCancel(true);
         return builder.build();
     }
 
-
-    /**
-     * 判断App通知是否开启
-     * 注意这个方法判断的是通知总开关，如果APP通知被关闭，则其下面的所有通知渠道也被关闭
-     */
     public static Boolean isNotificationEnabled(Context context) {
-        NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat
-                .from(context);
+        NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(context);
         return notificationManagerCompat.areNotificationsEnabled();
     }
 
-
-    /**
-     * 判断APP某个通知渠道的通知是否开启
-     */
-    @RequiresApi(Build.VERSION_CODES.S)
     public static Boolean isNotificationChannelEnabled(Context context, String channelId) {
-        NotificationManager notificationManager = (NotificationManager) context.getSystemService(
-                Context.NOTIFICATION_SERVICE);
-        NotificationChannel channel = notificationManager.getNotificationChannel(channelId);
-        return null != channel && channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationManager notificationManager = (NotificationManager) context.getSystemService(
+                    Context.NOTIFICATION_SERVICE);
+            if (notificationManager != null) {
+                NotificationChannel channel = notificationManager.getNotificationChannel(channelId);
+                return null != channel && channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
+            }
+        }
+        return true;
     }
 
-    /**
-     * 打开通知设置页面
-     */
     @SuppressLint("ObsoleteSdkInt")
     public static void openNotification(Context context) {
         String packageName = context.getPackageName();
@@ -185,29 +146,18 @@ public class AppNotification {
             intent.setAction(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
             intent.putExtra(Settings.EXTRA_APP_PACKAGE, packageName);
             intent.putExtra(Settings.EXTRA_CHANNEL_ID, uid);
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            intent.setAction("android.settings.APP_NOTIFICATION_SETTINGS");
-            intent.putExtra("app_package", packageName);
-            intent.putExtra("app_uid", uid);
-        } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.KITKAT) {
-            intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-            intent.addCategory(Intent.CATEGORY_DEFAULT);
-            intent.setData(Uri.parse("package:$packageName"));
         } else {
             intent.setAction(Settings.ACTION_SETTINGS);
         }
         context.startActivity(intent);
     }
 
-
-    /**
-     * 打开通知渠道设置页面
-     */
-    @RequiresApi(Build.VERSION_CODES.S)
     public static void openNotificationChannel(Context context, String channelId) {
-        Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS);
-        intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
-        intent.putExtra(Settings.EXTRA_CHANNEL_ID, channelId);
-        context.startActivity(intent);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS);
+            intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
+            intent.putExtra(Settings.EXTRA_CHANNEL_ID, channelId);
+            context.startActivity(intent);
+        }
     }
 }
