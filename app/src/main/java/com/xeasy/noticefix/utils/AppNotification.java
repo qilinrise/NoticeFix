@@ -26,6 +26,9 @@ import com.xeasy.noticefix.activity.MainActivity;
 public class AppNotification {
     private static int id = 1;
 
+    // 记录弹窗对象，防止重复弹窗，并支持返回时自动销毁
+    public static AlertDialog permissionDialog = null;
+
     public final static String mediaChannelId = "chat";
     public final static String mediaChannelName = "聊天";
     public final static int mediaChannelImportance = NotificationManager.IMPORTANCE_HIGH;
@@ -67,7 +70,6 @@ public class AppNotification {
         }
         String contextString = pkgName == null ? "null" : pkgName;
 
-        // 使用系统原生矢量通知图标，大图标置为 0 保持纯粹通知栏风格
         Notification notification = AppNotification.initNotice(context, AppNotification.mediaChannelId,
                 "easy-reset", contextString, R.drawable.ic_notification, 0, pi);
 
@@ -80,26 +82,34 @@ public class AppNotification {
 
     public static Notification initNotice(Context context, String channelId, String title,
                                            String text, int smallIcon, int largeIcon, PendingIntent pi) {
+        // 1. 判断全局通知是否开启，且同一时刻只允许存在一个提示框
         if (!isNotificationEnabled(context)) {
-            AlertDialog.Builder builder = new AlertDialog.Builder(context);
-            builder.setTitle("提示");
-            builder.setMessage("是否开启通知？");
-            builder.setPositiveButton("确定", (dialogInterface, i) -> openNotification(context));
-            builder.setNegativeButton("取消", null);
-            builder.show();
+            if (permissionDialog == null || !permissionDialog.isShowing()) {
+                AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                builder.setTitle("提示");
+                builder.setMessage("是否开启通知权限？");
+                builder.setPositiveButton("确定", (dialogInterface, i) -> {
+                    openNotification(context);
+                    if (permissionDialog != null) {
+                        permissionDialog.dismiss();
+                        permissionDialog = null;
+                    }
+                });
+                builder.setNegativeButton("取消", (dialogInterface, i) -> {
+                    if (permissionDialog != null) {
+                        permissionDialog.dismiss();
+                        permissionDialog = null;
+                    }
+                });
+                permissionDialog = builder.create();
+                permissionDialog.show();
+            }
         }
 
+        // 2. 静默创建通知渠道，彻底删除原版二次弹窗逻辑
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (!isNotificationChannelEnabled(context, channelId)) {
-                String message = "";
-                if (channelId.equals(mediaChannelId)) {
-                    message = mediaChannelName;
-                }
-                if (channelId.equals(foodChannelId)) {
-                    message = foodChannelName;
-                }
-                createNotificationChannel(context, channelId, message, NotificationManager.IMPORTANCE_HIGH);
-            }
+            String message = channelId.equals(mediaChannelId) ? mediaChannelName : foodChannelName;
+            createNotificationChannel(context, channelId, message, NotificationManager.IMPORTANCE_HIGH);
         }
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId);
@@ -118,6 +128,18 @@ public class AppNotification {
         builder.setContentIntent(pi);
         builder.setAutoCancel(true);
         return builder.build();
+    }
+
+    /**
+     * 当应用切回前台时调用：若用户已开启通知，自动关闭残留的弹窗
+     */
+    public static void checkAndDismissDialog(Context context) {
+        if (permissionDialog != null && permissionDialog.isShowing()) {
+            if (isNotificationEnabled(context)) {
+                permissionDialog.dismiss();
+                permissionDialog = null;
+            }
+        }
     }
 
     public static Boolean isNotificationEnabled(Context context) {
@@ -150,14 +172,5 @@ public class AppNotification {
             intent.setAction(Settings.ACTION_SETTINGS);
         }
         context.startActivity(intent);
-    }
-
-    public static void openNotificationChannel(Context context, String channelId) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS);
-            intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
-            intent.putExtra(Settings.EXTRA_CHANNEL_ID, channelId);
-            context.startActivity(intent);
-        }
     }
 }
