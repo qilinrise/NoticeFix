@@ -1,148 +1,115 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
     tools:context=".activity.MainActivity">
 
+    <!-- Material 3 顶栏 -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
-        android:paddingStart="3dp"
-        android:paddingEnd="8dp"
         android:layout_height="wrap_content"
-        >
+        android:background="@android:color/transparent"
+        app:elevation="0dp">
 
-        <androidx.appcompat.widget.Toolbar
+        <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            />
+            app:titleCentered="false"
+            app:titleTextAppearance="?attr/textAppearanceTitleLarge" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
-
-    <LinearLayout
+    <!-- 弹性滑动容器（彻底移除原本生硬的 55dp 平移） -->
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:translationY="55dp"
-        android:padding="5dp"
-        android:orientation="vertical">
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="24dp"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <TextView
-            android:paddingHorizontal="15dp"
-            android:paddingTop="15dp"
-            android:text="@string/application_introduction"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-        </TextView>
-        <TextView
-            android:padding="15dp"
-            android:id="@+id/xposed_status"
-            android:text="@string/xposed_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-        </TextView>
-
-        <TextView
-            android:padding="15dp"
-            android:text="@string/icon_setting"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-        </TextView>
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:paddingStart="15dp"
-            android:paddingEnd="15dp"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:id="@+id/main_recyclerView"
-            android:scrollbars="none"
-            >
-        </androidx.recyclerview.widget.RecyclerView>
-        <LinearLayout
-            android:layout_marginTop="10dp"
-            android:gravity="center"
-            android:padding="5dp"
-            android:orientation="horizontal"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-<!--            <Button-->
-<!--                android:id="@+id/icon_lib_config"-->
-<!--                android:text="@string/icon_lib_config"-->
-<!--                android:layout_width="wrap_content"-->
-<!--                android:layout_height="wrap_content"/>-->
-
-            <Button
-                android:id="@+id/custom_icon_config"
-                android:text="@string/custom_icon_config"
-                android:layout_width="wrap_content"
-                android:layout_height="60dp"/>
-
-
-        </LinearLayout>
-        <LinearLayout
-            android:gravity="center"
-            android:padding="5dp"
-            android:orientation="horizontal"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-            <Button
-                android:id="@+id/view_icon_lib"
-                android:text="@string/view_icon_lib"
-                android:layout_width="wrap_content"
-                android:layout_height="60dp"/>
-<!--            <Button-->
-<!--                android:layout_weight="@integer/material_motion_duration_long_1"-->
-<!--                android:id="@+id/notice_blacklist"-->
-<!--                android:text="@string/notice_blacklist"-->
-<!--                android:layout_margin="10dp"-->
-<!--                android:layout_width="wrap_content"-->
-<!--                android:layout_height="60dp"/>-->
-<!--            <Button-->
-<!--                android:layout_weight="@integer/material_motion_duration_long_1"-->
-<!--                android:id="@+id/notice_whitelist"-->
-<!--                android:text="@string/notice_whitelist"-->
-<!--                android:layout_margin="10dp"-->
-<!--                android:layout_width="wrap_content"-->
-<!--                android:layout_height="60dp"/>-->
-
-        </LinearLayout>
-        <LinearLayout
-            android:layout_marginTop="20dp"
-            android:gravity="center"
             android:orientation="vertical"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-<!--            <Button-->
-<!--                android:id="@+id/icon_lib_config"-->
-<!--                android:text="@string/icon_lib_config"-->
-<!--                android:layout_width="wrap_content"-->
-<!--                android:layout_height="wrap_content"/>-->
-            <!--提示: 修改后需要重启系统或重启SystemUI生效-->
-            <TextView
-                android:paddingStart="15dp"
-                android:paddingEnd="15dp"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="8dp">
+
+            <!-- 模块状态信息卡片 (M3 Expressive 24dp 大圆角) -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
-                android:gravity="center"
-                android:text="@string/app_main_tips"
-                android:layout_height="wrap_content"/>
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="0dp"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant">
 
-        </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
 
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/application_introduction"
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
 
-    </LinearLayout>
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="12dp"
+                        android:background="?attr/colorOutlineVariant" />
 
+                    <TextView
+                        android:id="@+id/xposed_status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/xposed_status"
+                        android:textAppearance="?attr/textAppearanceTitleMedium"
+                        android:textColor="?attr/colorOnSurface" />
 
-<!--    <include layout="@layout/content_main" />-->
+                </LinearLayout>
 
-<!--    <com.google.android.material.floatingactionbutton.FloatingActionButton-->
-<!--        android:id="@+id/fab"-->
-<!--        android:layout_width="wrap_content"-->
-<!--        android:layout_height="wrap_content"-->
-<!--        android:layout_gravity="bottom|end"-->
-<!--        android:layout_marginEnd="@dimen/fab_margin"-->
-<!--        android:layout_marginBottom="16dp"-->
-<!--        app:srcCompat="@android:drawable/ic_dialog_email" />-->
+            </com.google.android.material.card.MaterialCardView>
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+            <!-- 图标设置分组卡片 -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="0dp"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="4dp"
+                        android:paddingBottom="12dp"
+                        android:text="@string/icon_setting"
+                        android:textAppearance="?attr/textAppearanceTitleMedium"
+                        android:textColor="?attr/colorOnSurface" />
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/main_recyclerView"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:nestedScrollingEnabled="false"
+                        android:scrollbars="none" />
+
+ 
