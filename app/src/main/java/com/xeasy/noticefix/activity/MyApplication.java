@@ -2,6 +2,7 @@ package com.xeasy.noticefix.activity;
 
 import android.app.Application;
 
+import com.google.android.material.color.DynamicColors;
 import com.xeasy.noticefix.bean.AppInfo4View;
 import com.xeasy.noticefix.bean.IconLibBean;
 import com.xeasy.noticefix.dao.AppUtil;
@@ -20,6 +21,9 @@ public class MyApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        // 开启 Material You 莫奈取色：让全局组件与壁纸色调自动融合
+        DynamicColors.applyToActivitiesIfAvailable(this);
+
         // 缓存本机app情况
         IconLibDao.getIconLib(this, true);
 //        cacheTask4IconLibBean = IconLibDao.cacheIconLibMap(this);
