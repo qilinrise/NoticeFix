@@ -17,15 +17,14 @@
     <!-- 测试申请midi设备 -->
     <uses-feature android:name="android.software.midi" android:required="true"/>
 
+    <!-- 已移除 android:icon 和 android:roundIcon，系统会自动兜底显示为默认安卓机器人 -->
     <application
         android:name=".activity.MyApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:hardwareAccelerated="true"
-        android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         tools:targetApi="31">
         
@@ -73,7 +72,7 @@
                 android:value="" />
         </activity>
         
-        <!-- 主界面：已移除桌面启动图标，保留 LSPosed 模块直接调起入口 -->
+        <!-- 主界面：无桌面图标，保留 LSPosed 直接调起入口 -->
         <activity
             android:name=".activity.MainActivity"
             android:exported="true"
@@ -81,7 +80,6 @@
             android:theme="@style/Theme.NoticeFix.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <!-- Xposed / LSPosed 专属设置界面标记 -->
                 <category android:name="de.robv.android.xposed.category.MODULE_SETTINGS" />
             </intent-filter>
 
