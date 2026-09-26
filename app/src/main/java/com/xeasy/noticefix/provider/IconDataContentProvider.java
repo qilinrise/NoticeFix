@@ -38,7 +38,9 @@ public class IconDataContentProvider extends ContentProvider {
 
     @Override
     public boolean onCreate() {
-        // 核心修复 1：必须返回 true，通知系统该 Provider 初始化成功并对外开放
+        if (getContext() != null) {
+            GlobalConfigDao.initGlobalConfig(getContext());
+        }
         return true;
     }
 
@@ -49,8 +51,8 @@ public class IconDataContentProvider extends ContentProvider {
                         String[] selectionArgs, String sortOrder) {
         MatrixCursor matrixCursor = new MatrixCursor(new String[]{"globalConfig", "iconFunc", "libIconList", "customIconList"});
 
-        // 核心修复 2：防御冷启动空指针，确保配置初始化完成
-        if (GlobalConfigDao.globalConfigDao == null) {
+        // 核心修复：后台每次被查询时，强制从磁盘读取最新配置，绝不等待手动打开 Activity
+        if (getContext() != null) {
             GlobalConfigDao.initGlobalConfig(getContext());
         }
         GlobalConfigDao globalConfigDao = GlobalConfigDao.globalConfigDao;
@@ -59,8 +61,6 @@ public class IconDataContentProvider extends ContentProvider {
         }
 
         List<IconFuncDao.IconFuncStatus> iconFunc = IconFuncDao.getIconFunc(getContext());
-        
-        // 核心修复 3：传入 true，强制从本地持久化中加载你导入的图标包素材
         Map<String, IconLibBean> iconLib = IconLibDao.getIconLib(getContext(), true);
         Map<String, CustomIconBean> allCustomIcons = CustomIconDao.getAllCustomIcons(getContext());
 
