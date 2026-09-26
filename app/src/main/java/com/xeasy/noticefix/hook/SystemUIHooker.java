@@ -141,15 +141,29 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
             XposedBridge.hookMethod(methodsByExactParameters, new XC_MethodHook() {
                 @Override
                 protected void afterHookedMethod(MethodHookParam param) {
+                    // 核心修复：严禁对单色/白色素材打上 pre_L 标签，放行系统原生 DarkIconDispatcher 变色通道
                     if (HookConstant.getGlobalConfigDao() != null && HookConstant.getGlobalConfigDao().read && HookConstant.globalConfigDao.showColoredIcons) {
                         for (Object arg : param.args) {
                             if (arg instanceof View) {
                                 View iconView = (View) arg;
-                                @SuppressLint("DiscouragedApi")
-                                int preLTag = AndroidAppHelper.currentApplication().getResources().getIdentifier("icon_is_pre_L", "id", "com.android.systemui");
-                                if (preLTag != 0) {
-                                    iconView.setTag(preLTag, true);
+                                StatusBarNotification sbn = null;
+                                try {
+                                    sbn = (StatusBarNotification) ReflexUtil.getField4Obj(iconView, "mNotification");
+                                } catch (Exception ignored) {}
+
+                                // 只有通知明确包含自定义底色，且确实非单色位图时，才视作彩色图标处理
+                                if (sbn != null && sbn.getNotification() != null) {
+                                    Bitmap bmp = getBitmap4Icon(sbn.getNotification().getSmallIcon(), AndroidAppHelper.currentApplication());
+                                    if (bmp != null && !new ImageUtils().isGrayscale(bmp)) {
+                                        @SuppressLint("DiscouragedApi")
+                                        int preLTag = AndroidAppHelper.currentApplication().getResources().getIdentifier("icon_is_pre_L", "id", "com.android.systemui");
+                                        if (preLTag != 0) {
+                                            iconView.setTag(preLTag, true);
+                                        }
+                                        return;
+                                    }
                                 }
+                                // 单色矢量图标坚决不打 preLTag，确保随时响应系统深浅色变色
                             }
                         }
                     }
