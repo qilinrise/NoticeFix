@@ -8,8 +8,11 @@ import android.app.Application;
 import android.app.KeyguardManager;
 import android.app.Notification;
 import android.app.NotificationManager;
+import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -36,7 +39,6 @@ import com.xeasy.noticefix.utils.ReflexUtil;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -54,13 +56,16 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
 
     private static final String LOG_PREV = "NoticeFix---";
 
-    // 性能优化 1：引入 LruCache 内存缓存，避免重复解码 Base64 和重复像素运算
+    // 内存缓存：避免重复 Base64 转换和重复像素单色化计算
     private static final LruCache<String, Icon> sIconCache = new LruCache<>(80);
-    // 性能优化 2：IPC 请求时间戳节流，防止死循环卡死 Binder
+    // IPC 跨进程防抖时间戳
     private static long sLastReadConfigTime = 0;
+    // 监听器注册标记
+    private static boolean sReceiverRegistered = false;
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam loadPackageParam) {
+        // 激活状态自检 Hook
         if (loadPackageParam.packageName.equals("com.xeasy.noticefix")) {
             Class<?> aClass = XposedHelpers.findClass("com.xeasy.noticefix.activity.MainActivity", loadPackageParam.classLoader);
             XposedHelpers.findAndHookMethod(aClass, "activeXposed", boolean.class, new XC_MethodHook() {
@@ -71,26 +76,23 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
             });
         }
 
+        // 注入 SystemUI 核心逻辑
         if (loadPackageParam.packageName.equals("com.android.systemui")) {
             try {
                 NotificationListener(loadPackageParam.classLoader);
-            } catch (Exception e) {
-                XposedBridge.log(LOG_PREV + "hook -- NotificationListener 错误");
+            } catch (Exception ignored) {
             }
             try {
                 inflateViews(loadPackageParam.classLoader);
-            } catch (Exception e) {
-                XposedBridge.log(LOG_PREV + "hook -- inflateViews 错误");
+            } catch (Exception ignored) {
             }
             try {
                 setIcon(loadPackageParam.classLoader);
-            } catch (Exception e) {
-                XposedBridge.log(LOG_PREV + "hook -- setIcon 错误");
+            } catch (Exception ignored) {
             }
             try {
                 setSystemExpanded(loadPackageParam.classLoader);
-            } catch (Exception e) {
-                XposedBridge.log(LOG_PREV + "hook -- setSystemExpanded 错误");
+            } catch (Exception ignored) {
             }
         }
     }
@@ -105,6 +107,8 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
             @Override
             protected void afterHookedMethod(MethodHookParam param) {
                 HookConstant.objectMap.put("NotificationListener", param.thisObject);
+                // SystemUI 初始化完成后，立即挂载开机与解锁监听
+                registerUnlockReceiver(AndroidAppHelper.currentApplication());
             }
         };
         XposedHelpers.findAndHookConstructor(clazz, parameterTypesAndCallback);
@@ -123,11 +127,58 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                             if (mNotificationManager != null) {
                                 mNotificationManager.cancel(19960324);
                             }
-                            sIconCache.evictAll(); // 热刷新时清空内存缓存
+                            // 收到重置广播时，清空缓存并热更新所有通知
+                            sIconCache.evictAll();
                             readConfigOld(AndroidAppHelper.currentApplication());
+                            refreshAllActiveNotifications();
                         }
                     }
                 });
+    }
+
+    /**
+     * 解决重启后不打开模块不生效：开机解锁时自动静默加载配置并重绘通知
+     */
+    private static void registerUnlockReceiver(Context context) {
+        if (sReceiverRegistered || context == null) return;
+        try {
+            IntentFilter filter = new IntentFilter();
+            filter.addAction(Intent.ACTION_USER_PRESENT);
+            filter.addAction(Intent.ACTION_BOOT_COMPLETED);
+            context.registerReceiver(new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context ctx, Intent intent) {
+                    sLastReadConfigTime = 0;
+                    if (readConfigOld(ctx)) {
+                        refreshAllActiveNotifications();
+                    }
+                }
+            }, filter);
+            sReceiverRegistered = true;
+        } catch (Exception ignored) {
+        }
+    }
+
+    /**
+     * 重新派发当前已挂载在通知栏上的旧通知，强制应用最新颜色与图标
+     */
+    private static void refreshAllActiveNotifications() {
+        try {
+            Object listener = HookConstant.objectMap.get("NotificationListener");
+            if (listener != null) {
+                StatusBarNotification[] activeNotifications = (StatusBarNotification[]) ReflexUtil.runMethod(listener, "getActiveNotifications", new Object[]{});
+                Object currentRanking = ReflexUtil.runMethod(listener, "getCurrentRanking", new Object[]{});
+                if (activeNotifications != null) {
+                    for (StatusBarNotification sbn : activeNotifications) {
+                        if (!"com.xeasy.noticefix".equals(sbn.getPackageName())) {
+                            ReflexUtil.runMethod(listener, "onNotificationPosted", new Object[]{sbn, currentRanking},
+                                    StatusBarNotification.class, NotificationListenerService.RankingMap.class);
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private void setIcon(ClassLoader classLoader) {
@@ -141,7 +192,7 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
             XposedBridge.hookMethod(methodsByExactParameters, new XC_MethodHook() {
                 @Override
                 protected void afterHookedMethod(MethodHookParam param) {
-                    // 核心修复：严禁对单色/白色素材打上 pre_L 标签，放行系统原生 DarkIconDispatcher 变色通道
+                    // 仅当用户开启了“彩色图标”且素材确实不是单色图时，才打 pre_L 标签
                     if (HookConstant.getGlobalConfigDao() != null && HookConstant.getGlobalConfigDao().read && HookConstant.globalConfigDao.showColoredIcons) {
                         for (Object arg : param.args) {
                             if (arg instanceof View) {
@@ -149,11 +200,12 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                                 StatusBarNotification sbn = null;
                                 try {
                                     sbn = (StatusBarNotification) ReflexUtil.getField4Obj(iconView, "mNotification");
-                                } catch (Exception ignored) {}
+                                } catch (Exception ignored) {
+                                }
 
-                                // 只有通知明确包含自定义底色，且确实非单色位图时，才视作彩色图标处理
                                 if (sbn != null && sbn.getNotification() != null) {
                                     Bitmap bmp = getBitmap4Icon(sbn.getNotification().getSmallIcon(), AndroidAppHelper.currentApplication());
+                                    // 单色矢量图坚决不打 pre_L，放行系统原生深浅色着色管线
                                     if (bmp != null && !new ImageUtils().isGrayscale(bmp)) {
                                         @SuppressLint("DiscouragedApi")
                                         int preLTag = AndroidAppHelper.currentApplication().getResources().getIdentifier("icon_is_pre_L", "id", "com.android.systemui");
@@ -163,7 +215,6 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                                         return;
                                     }
                                 }
-                                // 单色矢量图标坚决不打 preLTag，确保随时响应系统深浅色变色
                             }
                         }
                     }
@@ -171,7 +222,7 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
             });
         }
 
-        // 性能优化 3：剔除 updateIconColor 中的 createPackageContext 和像素遍历，释放主线程
+        // 状态栏图标视图变色 Hook：放行单色图标的 DarkIconDispatcher 变色通道
         XposedHelpers.findAndHookMethod(
                 XposedHelpers.findClass("com.android.systemui.statusbar.StatusBarIconView", classLoader),
                 "updateIconColor",
@@ -179,7 +230,17 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                     @Override
                     protected void beforeHookedMethod(MethodHookParam param) {
                         if (HookConstant.getGlobalConfigDao() != null && HookConstant.getGlobalConfigDao().read && HookConstant.globalConfigDao.showColoredIcons) {
-                            ReflexUtil.setField4Obj("mCurrentSetColor", param.thisObject, 0);
+                            try {
+                                StatusBarNotification sbn = (StatusBarNotification) ReflexUtil.getField4Obj(param.thisObject, "mNotification");
+                                if (sbn != null && sbn.getNotification() != null) {
+                                    Bitmap bmp = getBitmap4Icon(sbn.getNotification().getSmallIcon(), AndroidAppHelper.currentApplication());
+                                    // 仅对真正的彩色位图抹除着色；单色矢量图交由系统自动变黑变白
+                                    if (bmp != null && !new ImageUtils().isGrayscale(bmp)) {
+                                        ReflexUtil.setField4Obj("mCurrentSetColor", param.thisObject, 0);
+                                    }
+                                }
+                            } catch (Exception ignored) {
+                            }
                         }
                     }
                 });
@@ -248,9 +309,10 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
         XC_MethodHook xc_methodHook = new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) {
-                // 性能优化 4：节流控制，未读到配置且距离上次读取超过 10 秒才重试，严禁每帧轰炸 IPC
+                registerUnlockReceiver(AndroidAppHelper.currentApplication());
                 long now = System.currentTimeMillis();
-                if ((HookConstant.globalConfigDao == null || !HookConstant.globalConfigDao.read) && (now - sLastReadConfigTime > 10000)) {
+                // 节流机制：严禁频繁跨进程查询引起 Binder 阻塞
+                if ((HookConstant.globalConfigDao == null || !HookConstant.globalConfigDao.read) && (now - sLastReadConfigTime > 3000)) {
                     sLastReadConfigTime = now;
                     readConfigOld(AndroidAppHelper.currentApplication());
                 }
@@ -281,8 +343,8 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
         }
     }
 
-    private void readConfigOld(Context context) {
-        if (context == null) return;
+    private static boolean readConfigOld(Context context) {
+        if (context == null) return false;
         try {
             ContentResolver contentResolver = context.getContentResolver();
             Uri uri = Uri.parse("content://com.xeasy.noticefix.provider.IconDataContentProvider");
@@ -304,10 +366,11 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                 HookConstant.iconLibBeanMap = gson.fromJson(libIconList, type2);
                 Type type3 = new TypeToken<Map<String, CustomIconBean>>() {}.getType();
                 HookConstant.customIconBeanMap = gson.fromJson(customIconList, type3);
+                return true;
             }
-        } catch (Exception e) {
-            XposedBridge.log(LOG_PREV + "读取图标资源失败，稍后自动重试");
+        } catch (Exception ignored) {
         }
+        return false;
     }
 
     public static void fixNotificationIcon(StatusBarNotification statusBarNotification, Context context) {
@@ -324,7 +387,7 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                 }
             }
 
-            // 缓存命中检查：同一应用处理过一次后直接使用内存缓存
+            // 命中内存缓存直接设置，零延迟
             Icon cached = sIconCache.get(packageName);
             if (cached != null) {
                 ImageTools.setSmallIcon(cached, notification);
@@ -352,6 +415,7 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                         if (iconLibBean != null) {
                             Bitmap raw = ImageTools.base64ToBitmap(iconLibBean.iconBitmap);
                             if (raw != null) {
+                                // 核心：未开彩色模式下，强制洗成单色透明图，供原生状态栏自由变黑变白
                                 Bitmap finalBmp = (HookConstant.globalConfigDao != null && HookConstant.globalConfigDao.showColoredIcons)
                                         ? raw : ImageTools.getSinglePic(raw);
                                 Icon newIcon = Icon.createWithBitmap(finalBmp);
@@ -378,7 +442,7 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                             }
                         }
                     }
-                    // 3. 算法分支
+                    // 3. 内置算法分支
                     if (iconFuncStatus.iconFuncId == IconFunc.AUTO_FIX.funcId) {
                         Bitmap bitmap = getBitmap4Icon(smallIcon, context);
                         if (!new ImageUtils().isGrayscale(bitmap)) {
@@ -416,4 +480,4 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
         Drawable drawable = smallIcon.loadDrawable(context);
         return ImageTools.toBitmap(drawable);
     }
-}
+            }
