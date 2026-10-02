@@ -62,7 +62,6 @@ public class IconOrderAdapter extends RecyclerView.Adapter<IconOrderAdapter.View
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         IconFuncDao.IconFuncStatus item = list.get(position);
 
-        // 使用已有的枚举常量 funcId 安全匹配名称，不依赖任何未知变量
         String title;
         if (item.iconFuncId == IconFunc.LIB_FIX.funcId) {
             title = "图标库";
@@ -75,12 +74,18 @@ public class IconOrderAdapter extends RecyclerView.Adapter<IconOrderAdapter.View
         }
         holder.tv.setText(title);
 
-        holder.status.setOnCheckedChangeListener(null);
-        holder.status.setChecked(item.active);
-        holder.status.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            item.active = isChecked;
-            IconFuncDao.save(context, item);
-        });
+        if (holder.status != null) {
+            // 代码层强制关闭文字测量，并补齐非空文本，确保在任何机型系统测量时均不报错
+            holder.status.setShowText(false);
+            holder.status.setTextOn("");
+            holder.status.setTextOff("");
+            holder.status.setOnCheckedChangeListener(null);
+            holder.status.setChecked(item.active);
+            holder.status.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                item.active = isChecked;
+                IconFuncDao.save(context, item);
+            });
+        }
 
         if (holder.dragButton != null) {
             holder.dragButton.setOnTouchListener((v, event) -> {
@@ -107,6 +112,13 @@ public class IconOrderAdapter extends RecyclerView.Adapter<IconOrderAdapter.View
             tv = itemView.findViewById(R.id.icon_config_content);
             status = itemView.findViewById(R.id.icon_config_switchCompat);
             dragButton = itemView.findViewById(R.id.icon_config_content_order);
+
+            // 初始化阶段提前做好空指针防护
+            if (status != null) {
+                status.setShowText(false);
+                status.setTextOn("");
+                status.setTextOff("");
+            }
         }
     }
 }
