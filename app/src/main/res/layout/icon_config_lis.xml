@@ -32,10 +32,14 @@
         android:textColor="?android:attr/textColorPrimary"
         android:textSize="15sp" />
 
-    <!-- 核心替换：使用现代 Material 3 胶囊滑块控件（保持 ID 不变，Java 代码无需变动） -->
+    <!-- 核心修复：添加 app:showText="false" 和空文本兜底，杜绝 StaticLayout 空指针闪退 -->
     <com.google.android.material.materialswitch.MaterialSwitch
         android:id="@+id/icon_config_switchCompat"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content"
+        android:showText="false"
+        app:showText="false"
+        android:textOn=""
+        android:textOff="" />
 
 </LinearLayout>
