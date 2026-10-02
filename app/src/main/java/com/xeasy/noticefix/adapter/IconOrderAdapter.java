@@ -15,78 +15,89 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.xeasy.noticefix.R;
-import com.xeasy.noticefix.bean.IconFunc;
 import com.xeasy.noticefix.dao.IconFuncDao;
 
+import java.util.Collections;
 import java.util.List;
 
-/**
- * 可拖拽列表的适配器，
- */
 public class IconOrderAdapter extends RecyclerView.Adapter<IconOrderAdapter.ViewHolder> {
-
-
-    private final List<IconFuncDao.IconFuncStatus> dataList;
-    private final ItemTouchHelper mItemTouchHelper;
+    private final List<IconFuncDao.IconFuncStatus> list;
     private final Context context;
+    private final ItemTouchHelper itemTouchHelper;
 
-    public IconOrderAdapter(List<IconFuncDao.IconFuncStatus> dataList, RecyclerView recyclerView
-            , Context context) {
-        this.dataList = dataList;
+    public IconOrderAdapter(List<IconFuncDao.IconFuncStatus> list, RecyclerView recyclerView, Context context) {
+        this.list = list;
         this.context = context;
-        ItemTouchHelper mItemTouchHelper = new ItemTouchHelper(new MyItemTouchHelperCallback(this, dataList, context));
-        this.mItemTouchHelper = mItemTouchHelper;
-        mItemTouchHelper.attachToRecyclerView(recyclerView);
+
+        ItemTouchHelper.Callback callback = new ItemTouchHelper.SimpleCallback(
+                ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
+            @Override
+            public boolean onMove(@NonNull RecyclerView rv, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
+                int fromPosition = viewHolder.getAdapterPosition();
+                int toPosition = target.getAdapterPosition();
+                Collections.swap(list, fromPosition, toPosition);
+                notifyItemMoved(fromPosition, toPosition);
+                return true;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+            }
+
+            @Override
+            public void clearView(@NonNull RecyclerView rv, @NonNull RecyclerView.ViewHolder viewHolder) {
+                super.clearView(rv, viewHolder);
+                for (int i = 0; i < list.size(); i++) {
+                    list.get(i).order = i;
+                }
+                IconFuncDao.saveIconFunc(context, list);
+            }
+        };
+        this.itemTouchHelper = new ItemTouchHelper(callback);
+        this.itemTouchHelper.attachToRecyclerView(recyclerView);
     }
-
-
-
 
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.icon_config_list, parent, false);
+        // 读取无 t 的正确文件名 icon_config_lis
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.icon_config_lis, parent, false);
         return new ViewHolder(view);
     }
 
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        IconFuncDao.IconFuncStatus content = dataList.get(position);
-        Integer descById = IconFunc.getDescById(content.iconFuncId);
-        assert descById != null;
-        // desc
-        holder.tv.setText(context.getString(descById));
-        // status
-        holder.status.setChecked(content.active);
-
-        // 调优先级事件
-        holder.dragButton.setOnTouchListener((v, event) -> {
-            if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
-                mItemTouchHelper.startDrag(holder);
-            }
-            v.performClick();
-            return false;
-        });
-        // 开关事件
+        IconFuncDao.IconFuncStatus item = list.get(position);
+        holder.tv.setText(item.funcName);
+        holder.status.setOnCheckedChangeListener(null);
+        holder.status.setChecked(item.active);
         holder.status.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            content.active = isChecked;
-            // 持久化
-            IconFuncDao.save(context, content);
+            item.active = isChecked;
+            IconFuncDao.saveIconFunc(context, list);
         });
+
+        if (holder.dragButton != null) {
+            holder.dragButton.setOnTouchListener((v, event) -> {
+                if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    itemTouchHelper.startDrag(holder);
+                }
+                return false;
+            });
+        }
     }
 
     @Override
     public int getItemCount() {
-        return dataList == null ? 0 : dataList.size();
+        return list == null ? 0 : list.size();
     }
 
-    static class ViewHolder extends RecyclerView.ViewHolder {
-        private final TextView tv;
-        private final SwitchCompat status;
-        private final ImageView dragButton;
+    public static class ViewHolder extends RecyclerView.ViewHolder {
+        public TextView tv;
+        public SwitchCompat status;
+        public ImageView dragButton;
 
-        ViewHolder(@NonNull View itemView) {
+        public ViewHolder(@NonNull View itemView) {
             super(itemView);
             tv = itemView.findViewById(R.id.icon_config_content);
             status = itemView.findViewById(R.id.icon_config_switchCompat);
