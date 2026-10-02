@@ -18,18 +18,19 @@ import com.xeasy.noticefix.R;
 import com.xeasy.noticefix.activity.MainActivity;
 
 /**
- * App的通知渠道配置与发送（纯通知工具，不执行任何侵入式UI弹窗）
+ * App 通知渠道与推送管理（完整支持横幅悬浮弹出与状态栏小图标）
  */
 @SuppressWarnings("unused")
 public class AppNotification {
-    private static int id = 1;
+    private static int id = 1000;
 
-    public final static String mediaChannelId = "chat";
-    public final static String mediaChannelName = "聊天";
+    // 更换为新 Channel ID（避开系统旧渠道降级缓存，强迫系统赋予最高横幅弹出权限）
+    public final static String mediaChannelId = "notice_channel_v4";
+    public final static String mediaChannelName = "通知与测试提醒";
     public final static int mediaChannelImportance = NotificationManager.IMPORTANCE_HIGH;
 
-    public final static String foodChannelId = "0x2";
-    public final static String foodChannelName = "美食";
+    public final static String foodChannelId = "food_channel_v2";
+    public final static String foodChannelName = "美食服务";
     public final static int foodChannelImportance = NotificationManager.IMPORTANCE_DEFAULT;
 
     public static void createNotificationChannel(Context applicationContext, String channelId,
@@ -38,9 +39,13 @@ public class AppNotification {
             NotificationManager notificationManager = (NotificationManager) applicationContext.getSystemService(
                     Context.NOTIFICATION_SERVICE);
             if (notificationManager != null && notificationManager.getNotificationChannel(channelId) == null) {
-                NotificationChannel notificationChannel = new NotificationChannel(channelId, channelIdName,
-                        channelIdImportance);
-                notificationManager.createNotificationChannel(notificationChannel);
+                NotificationChannel channel = new NotificationChannel(channelId, channelIdName, channelIdImportance);
+                // 激活横幅（Heads-up）必需的震动、呼吸灯和锁屏配置
+                channel.enableLights(true);
+                channel.enableVibration(true);
+                channel.setVibrationPattern(new long[]{0, 250, 250, 250});
+                channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+                notificationManager.createNotificationChannel(channel);
             }
         }
     }
@@ -63,10 +68,18 @@ public class AppNotification {
         } else {
             pi = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
         }
-        String contextString = pkgName == null ? "null" : pkgName;
+        String contextString = pkgName == null ? "NoticeFix 规则已重载" : pkgName;
 
-        Notification notification = AppNotification.initNotice(context, AppNotification.mediaChannelId,
-                "easy-reset", contextString, R.drawable.ic_notification, 0, pi);
+        // 发送带图标的横幅测试通知
+        Notification notification = AppNotification.initNotice(
+                context,
+                AppNotification.mediaChannelId,
+                "NoticeFix 测试提醒",
+                contextString,
+                R.drawable.ic_notification,
+                0,
+                pi
+        );
 
         NotificationManager notificationManager = (NotificationManager) context.getSystemService(
                 Context.NOTIFICATION_SERVICE);
@@ -78,15 +91,23 @@ public class AppNotification {
     public static Notification initNotice(Context context, String channelId, String title,
                                           String text, int smallIcon, int largeIcon, PendingIntent pi) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            String message = channelId.equals(mediaChannelId) ? mediaChannelName : foodChannelName;
-            createNotificationChannel(context, channelId, message, NotificationManager.IMPORTANCE_HIGH);
+            createNotificationChannel(context, channelId, mediaChannelName, NotificationManager.IMPORTANCE_HIGH);
         }
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId);
         builder.setContentTitle(title);
         builder.setContentText(text);
         builder.setWhen(System.currentTimeMillis());
-        builder.setSmallIcon(smallIcon != 0 ? smallIcon : R.drawable.ic_notification);
+
+        // 核心属性：配置最高优先级、震动以及公开可见性，触发原生系统的 Heads-up 横幅弹窗
+        builder.setPriority(NotificationCompat.PRIORITY_MAX);
+        builder.setDefaults(NotificationCompat.DEFAULT_ALL);
+        builder.setVibrate(new long[]{0, 250, 250, 250});
+        builder.setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
+
+        // 核心属性：设置合法状态栏矢量小图标，避免传 0 导致系统丢弃图标
+        int validSmallIcon = smallIcon != 0 ? smallIcon : R.drawable.ic_notification;
+        builder.setSmallIcon(validSmallIcon);
 
         if (largeIcon != 0) {
             try {
@@ -95,7 +116,9 @@ public class AppNotification {
             }
         }
 
-        builder.setContentIntent(pi);
+        if (pi != null) {
+            builder.setContentIntent(pi);
+        }
         builder.setAutoCancel(true);
         return builder.build();
     }
