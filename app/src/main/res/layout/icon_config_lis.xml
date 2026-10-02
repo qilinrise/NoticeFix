@@ -32,14 +32,11 @@
         android:textColor="?android:attr/textColorPrimary"
         android:textSize="15sp" />
 
-    <!-- 核心修复：添加 app:showText="false" 和空文本兜底，杜绝 StaticLayout 空指针闪退 -->
+    <!-- 显式绑定 Material 3 Switch 样式，保证滑块和胶囊轨道正常绘制 -->
     <com.google.android.material.materialswitch.MaterialSwitch
         android:id="@+id/icon_config_switchCompat"
+        style="@style/Widget.Material3.CompoundButton.MaterialSwitch"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:showText="false"
-        app:showText="false"
-        android:textOn=""
-        android:textOff="" />
+        android:layout_height="wrap_content" />
 
 </LinearLayout>
