@@ -70,8 +70,9 @@
                         android:textSize="13sp" />
                 </LinearLayout>
 
-                <androidx.appcompat.widget.SwitchCompat
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/debug_mode"
+                    style="@style/Widget.Material3.CompoundButton.MaterialSwitch"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
@@ -113,8 +114,9 @@
                         android:textSize="13sp" />
                 </LinearLayout>
 
-                <androidx.appcompat.widget.SwitchCompat
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/always_handle_proxy_notice"
+                    style="@style/Widget.Material3.CompoundButton.MaterialSwitch"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:checked="true"
@@ -156,8 +158,9 @@
                         android:textSize="13sp" />
                 </LinearLayout>
 
-                <androidx.appcompat.widget.SwitchCompat
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/skip_grayscale_icon"
+                    style="@style/Widget.Material3.CompoundButton.MaterialSwitch"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:checked="true"
@@ -200,8 +203,9 @@
                         android:textSize="13sp" />
                 </LinearLayout>
 
-                <androidx.appcompat.widget.SwitchCompat
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/show_colored_icons"
+                    style="@style/Widget.Material3.CompoundButton.MaterialSwitch"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
@@ -244,8 +248,9 @@
                         android:textSize="13sp" />
                 </LinearLayout>
 
-                <androidx.appcompat.widget.SwitchCompat
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/expand_all_notice"
+                    style="@style/Widget.Material3.CompoundButton.MaterialSwitch"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
