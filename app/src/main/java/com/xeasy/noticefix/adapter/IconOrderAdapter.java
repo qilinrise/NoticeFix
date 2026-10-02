@@ -10,10 +10,10 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.widget.SwitchCompat;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.materialswitch.MaterialSwitch;
 import com.xeasy.noticefix.R;
 import com.xeasy.noticefix.bean.IconFunc;
 import com.xeasy.noticefix.dao.IconFuncDao;
@@ -75,10 +75,6 @@ public class IconOrderAdapter extends RecyclerView.Adapter<IconOrderAdapter.View
         holder.tv.setText(title);
 
         if (holder.status != null) {
-            // 代码层强制关闭文字测量，并补齐非空文本，确保在任何机型系统测量时均不报错
-            holder.status.setShowText(false);
-            holder.status.setTextOn("");
-            holder.status.setTextOff("");
             holder.status.setOnCheckedChangeListener(null);
             holder.status.setChecked(item.active);
             holder.status.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -104,7 +100,7 @@ public class IconOrderAdapter extends RecyclerView.Adapter<IconOrderAdapter.View
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
         public TextView tv;
-        public SwitchCompat status;
+        public MaterialSwitch status;
         public ImageView dragButton;
 
         public ViewHolder(@NonNull View itemView) {
@@ -112,13 +108,6 @@ public class IconOrderAdapter extends RecyclerView.Adapter<IconOrderAdapter.View
             tv = itemView.findViewById(R.id.icon_config_content);
             status = itemView.findViewById(R.id.icon_config_switchCompat);
             dragButton = itemView.findViewById(R.id.icon_config_content_order);
-
-            // 初始化阶段提前做好空指针防护
-            if (status != null) {
-                status.setShowText(false);
-                status.setTextOn("");
-                status.setTextOff("");
-            }
         }
     }
 }
