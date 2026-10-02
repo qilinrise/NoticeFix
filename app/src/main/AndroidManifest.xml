@@ -6,7 +6,6 @@
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <!-- 请求通知权限 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission
@@ -14,10 +13,8 @@
         tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- 测试申请midi设备 -->
     <uses-feature android:name="android.software.midi" android:required="true"/>
 
-    <!-- 已移除 android:icon 和 android:roundIcon，系统会自动兜底显示为默认安卓机器人 -->
     <application
         android:name=".activity.MyApplication"
         android:allowBackup="true"
@@ -37,6 +34,7 @@
                 android:value="" />
         </activity>
 
+        <!-- 移除 directBootAware，恢复标准受保护跨进程通信 -->
         <provider
             android:name=".provider.IconDataContentProvider"
             android:authorities="com.xeasy.noticefix.provider.IconDataContentProvider"
@@ -72,7 +70,6 @@
                 android:value="" />
         </activity>
         
-        <!-- 主界面：无桌面图标，保留 LSPosed 直接调起入口 -->
         <activity
             android:name=".activity.MainActivity"
             android:exported="true"
@@ -80,6 +77,7 @@
             android:theme="@style/Theme.NoticeFix.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="de.robv.android.xposed.category.MODULE_SETTINGS" />
             </intent-filter>
 
