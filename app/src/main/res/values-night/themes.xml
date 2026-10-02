@@ -1,21 +1,23 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- 夜间模式基础主题 -->
     <style name="Theme.NoticeFix" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
-        <!-- 主色调 -->
         <item name="colorPrimary">?attr/colorPrimary</item>
         <item name="colorPrimaryVariant">?attr/colorPrimaryVariant</item>
         <item name="colorOnPrimary">@android:color/black</item>
-        <!-- 次要色调 -->
         <item name="colorSecondary">?attr/colorSecondary</item>
         <item name="colorSecondaryVariant">?attr/colorSecondaryVariant</item>
         <item name="colorOnSecondary">@android:color/black</item>
-        <!-- 状态栏颜色 -->
         <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
     </style>
 
-    <!-- 夜间模式无标题栏主题（继承 MaterialComponents，防止夜间模式下 MaterialCardView 缺失属性崩溃） -->
+    <!-- 解决夜间模式下 MaterialCardView 缺失属性闪退问题 -->
     <style name="Theme.NoticeFix.NoActionBar" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
     </style>
+
+    <!-- 补齐夜间模式 Overlay 样式 -->
+    <style name="Theme.NoticeFix.AppBarOverlay" parent="ThemeOverlay.MaterialComponents.Dark.ActionBar" />
+
+    <style name="Theme.NoticeFix.PopupOverlay" parent="ThemeOverlay.MaterialComponents.Light" />
 </resources>
