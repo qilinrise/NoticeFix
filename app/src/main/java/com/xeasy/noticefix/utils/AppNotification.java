@@ -8,27 +8,21 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.BitmapFactory;
-import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.xeasy.noticefix.R;
 import com.xeasy.noticefix.activity.MainActivity;
 
 /**
- * App的通知渠道配置与发送
+ * App的通知渠道配置与发送（纯通知工具，不执行任何侵入式UI弹窗）
  */
 @SuppressWarnings("unused")
 public class AppNotification {
     private static int id = 1;
-
-    // 记录弹窗对象，防重叠并支持返回自动关闭
-    public static AlertDialog permissionDialog = null;
 
     public final static String mediaChannelId = "chat";
     public final static String mediaChannelName = "聊天";
@@ -83,31 +77,6 @@ public class AppNotification {
 
     public static Notification initNotice(Context context, String channelId, String title,
                                           String text, int smallIcon, int largeIcon, PendingIntent pi) {
-        // Material 3 现代大圆角对话框
-        if (!isNotificationEnabled(context)) {
-            if (permissionDialog == null || !permissionDialog.isShowing()) {
-                MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context);
-                builder.setTitle("开启通知权限");
-                builder.setMessage("NoticeFix 需要通知权限以测试及刷新状态栏图标，是否前往系统设置开启？");
-                builder.setPositiveButton("前往开启", (dialogInterface, i) -> {
-                    openNotification(context);
-                    if (permissionDialog != null) {
-                        permissionDialog.dismiss();
-                        permissionDialog = null;
-                    }
-                });
-                builder.setNegativeButton("取消", (dialogInterface, i) -> {
-                    if (permissionDialog != null) {
-                        permissionDialog.dismiss();
-                        permissionDialog = null;
-                    }
-                });
-                permissionDialog = builder.create();
-                permissionDialog.show();
-            }
-        }
-
-        // 静默创建渠道
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             String message = channelId.equals(mediaChannelId) ? mediaChannelName : foodChannelName;
             createNotificationChannel(context, channelId, message, NotificationManager.IMPORTANCE_HIGH);
@@ -129,15 +98,6 @@ public class AppNotification {
         builder.setContentIntent(pi);
         builder.setAutoCancel(true);
         return builder.build();
-    }
-
-    public static void checkAndDismissDialog(Context context) {
-        if (permissionDialog != null && permissionDialog.isShowing()) {
-            if (isNotificationEnabled(context)) {
-                permissionDialog.dismiss();
-                permissionDialog = null;
-            }
-        }
     }
 
     public static Boolean isNotificationEnabled(Context context) {
