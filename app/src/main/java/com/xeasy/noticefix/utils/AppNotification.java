@@ -1,7 +1,6 @@
 package com.xeasy.noticefix.utils;
 
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -13,9 +12,11 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.xeasy.noticefix.R;
 import com.xeasy.noticefix.activity.MainActivity;
 
@@ -26,7 +27,7 @@ import com.xeasy.noticefix.activity.MainActivity;
 public class AppNotification {
     private static int id = 1;
 
-    // 记录弹窗对象，防止重复弹窗，并支持返回时自动销毁
+    // 记录弹窗对象，防重叠并支持返回自动关闭
     public static AlertDialog permissionDialog = null;
 
     public final static String mediaChannelId = "chat";
@@ -60,7 +61,7 @@ public class AppNotification {
         }
     }
 
-    public static void sendFlashNoticeMessage(Context context, String pkgName){
+    public static void sendFlashNoticeMessage(Context context, String pkgName) {
         Intent intent = new Intent(context, MainActivity.class);
         PendingIntent pi;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -81,14 +82,14 @@ public class AppNotification {
     }
 
     public static Notification initNotice(Context context, String channelId, String title,
-                                           String text, int smallIcon, int largeIcon, PendingIntent pi) {
-        // 1. 判断全局通知是否开启，且同一时刻只允许存在一个提示框
+                                          String text, int smallIcon, int largeIcon, PendingIntent pi) {
+        // Material 3 现代大圆角对话框
         if (!isNotificationEnabled(context)) {
             if (permissionDialog == null || !permissionDialog.isShowing()) {
-                AlertDialog.Builder builder = new AlertDialog.Builder(context);
-                builder.setTitle("提示");
-                builder.setMessage("是否开启通知权限？");
-                builder.setPositiveButton("确定", (dialogInterface, i) -> {
+                MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context);
+                builder.setTitle("开启通知权限");
+                builder.setMessage("NoticeFix 需要通知权限以测试及刷新状态栏图标，是否前往系统设置开启？");
+                builder.setPositiveButton("前往开启", (dialogInterface, i) -> {
                     openNotification(context);
                     if (permissionDialog != null) {
                         permissionDialog.dismiss();
@@ -106,7 +107,7 @@ public class AppNotification {
             }
         }
 
-        // 2. 静默创建通知渠道，彻底删除原版二次弹窗逻辑
+        // 静默创建渠道
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             String message = channelId.equals(mediaChannelId) ? mediaChannelName : foodChannelName;
             createNotificationChannel(context, channelId, message, NotificationManager.IMPORTANCE_HIGH);
@@ -130,9 +131,6 @@ public class AppNotification {
         return builder.build();
     }
 
-    /**
-     * 当应用切回前台时调用：若用户已开启通知，自动关闭残留的弹窗
-     */
     public static void checkAndDismissDialog(Context context) {
         if (permissionDialog != null && permissionDialog.isShowing()) {
             if (isNotificationEnabled(context)) {
