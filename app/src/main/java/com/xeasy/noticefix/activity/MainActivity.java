@@ -20,6 +20,7 @@ import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.color.DynamicColors;
 import com.xeasy.noticefix.R;
 import com.xeasy.noticefix.adapter.IconOrderAdapter;
 import com.xeasy.noticefix.dao.IconFuncDao;
@@ -35,6 +36,8 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // 核心：在初始化前注入系统莫奈动态取色（完美对齐系统设置色彩）
+        DynamicColors.applyToActivityIfAvailable(this);
         super.onCreate(savedInstanceState);
 
         try {
@@ -47,7 +50,6 @@ public class MainActivity extends AppCompatActivity {
             setContentView(R.layout.activity_main);
         }
 
-        // Android 13+ 仅由原生系统 API 发起授权，不依赖任何第三方弹窗
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                     != PackageManager.PERMISSION_GRANTED) {
@@ -92,10 +94,10 @@ public class MainActivity extends AppCompatActivity {
         if (status != null) {
             if (active) {
                 status.setText(getString(R.string.xposed_status, getString(R.string.yes)));
-                status.setTextColor(getColor(android.R.color.holo_green_dark));
+                status.setTextColor(getColor(android.R.color.holo_green_light));
             } else {
                 status.setText(getString(R.string.xposed_status, getString(R.string.no)));
-                status.setTextColor(getColor(android.R.color.holo_red_dark));
+                status.setTextColor(getColor(android.R.color.holo_red_light));
             }
         }
     }
@@ -127,7 +129,6 @@ public class MainActivity extends AppCompatActivity {
             AppNotification.sendFlashNoticeMessage(this, null);
         }
         if (id == R.id.restart_systemui) {
-            // 使用 androidx.appcompat.app.AlertDialog，完全兼容当前项目主题，杜绝抛错
             new AlertDialog.Builder(this)
                     .setTitle("确认")
                     .setMessage("确定要重启 SystemUI 吗？")
