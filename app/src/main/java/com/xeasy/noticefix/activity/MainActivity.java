@@ -1,8 +1,10 @@
 package com.xeasy.noticefix.activity;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -11,10 +13,13 @@ import android.view.View;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.xeasy.noticefix.R;
 import com.xeasy.noticefix.adapter.IconOrderAdapter;
 import com.xeasy.noticefix.dao.IconFuncDao;
@@ -38,7 +43,16 @@ public class MainActivity extends AppCompatActivity {
 
         setSupportActionBar(binding.toolbar);
 
-        // 从工具类获取配置文件信息
+        // Android 13+ 直接唤起原生系统授权弹窗
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS}, 101);
+            }
+        }
+
+        // 获取优先级配置
         List<IconFuncDao.IconFuncStatus> iconFunc = IconFuncDao.getIconFunc(this);
 
         RecyclerView recyclerView = findViewById(R.id.main_recyclerView);
@@ -47,14 +61,14 @@ public class MainActivity extends AppCompatActivity {
         IconOrderAdapter adapter = new IconOrderAdapter(iconFunc, recyclerView, this);
         recyclerView.setAdapter(adapter);
 
-        // 自定义图标页面跳转
+        // 自定义图标跳转
         View viewById = findViewById(R.id.custom_icon_config);
         viewById.setOnClickListener(v -> {
             Intent intent = new Intent(MainActivity.this, AppListActivity.class);
             startActivity(intent);
         });
-        
-        // 图标库页面跳转
+
+        // 图标库跳转
         View viewIconLib = findViewById(R.id.view_icon_lib);
         viewIconLib.setOnClickListener(v -> {
             Intent intent = new Intent(MainActivity.this, IconLibActivity.class);
@@ -67,14 +81,14 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // 从系统设置开启权限切回前台时，自动检测并关闭提示弹窗
+        // 前台恢复时若已授权则自动关闭弹窗
         AppNotification.checkAndDismissDialog(this);
     }
 
     @SuppressWarnings("SameParameterValue")
     private void activeXposed(boolean active) {
         TextView status = findViewById(R.id.xposed_status);
-        if ( active ) {
+        if (active) {
             status.setText(getString(R.string.xposed_status, getString(R.string.yes)));
             status.setTextColor(getColor(android.R.color.holo_green_dark));
         } else {
@@ -110,12 +124,16 @@ public class MainActivity extends AppCompatActivity {
             AppNotification.sendFlashNoticeMessage(this, null);
         }
         if (id == R.id.restart_systemui) {
-            new AlertDialog.Builder(this).setTitle("confirm")
-                    .setMessage("Restart SystemUI ? ")
-                    .setPositiveButton(this.getString(R.string.yes), (dialog, which) -> {
+            // Material 3 确认对话框
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("确认")
+                    .setMessage("确定要重启 SystemUI 吗？")
+                    .setPositiveButton(getString(R.string.yes), (dialog, which) -> {
                         CommandUtil.restartSystemUI(this);
-                    }).setNegativeButton(this.getString(R.string.no), (dialog, which) -> {
-                    }).show();
+                    })
+                    .setNegativeButton(getString(R.string.no), (dialog, which) -> {
+                    })
+                    .show();
 
             return true;
         }
