@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.xeasy.noticefix.R;
+import com.xeasy.noticefix.bean.IconFunc;
 import com.xeasy.noticefix.dao.IconFuncDao;
 
 import java.util.Collections;
@@ -37,20 +38,13 @@ public class IconOrderAdapter extends RecyclerView.Adapter<IconOrderAdapter.View
                 int toPosition = target.getAdapterPosition();
                 Collections.swap(list, fromPosition, toPosition);
                 notifyItemMoved(fromPosition, toPosition);
+                // 对齐 IconFuncDao 原生交换顺序方法
+                IconFuncDao.saveSwap(context, fromPosition, toPosition);
                 return true;
             }
 
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
-            }
-
-            @Override
-            public void clearView(@NonNull RecyclerView rv, @NonNull RecyclerView.ViewHolder viewHolder) {
-                super.clearView(rv, viewHolder);
-                for (int i = 0; i < list.size(); i++) {
-                    list.get(i).order = i;
-                }
-                IconFuncDao.saveIconFunc(context, list);
             }
         };
         this.itemTouchHelper = new ItemTouchHelper(callback);
@@ -60,7 +54,6 @@ public class IconOrderAdapter extends RecyclerView.Adapter<IconOrderAdapter.View
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        // 读取无 t 的正确文件名 icon_config_lis
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.icon_config_lis, parent, false);
         return new ViewHolder(view);
     }
@@ -69,12 +62,23 @@ public class IconOrderAdapter extends RecyclerView.Adapter<IconOrderAdapter.View
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         IconFuncDao.IconFuncStatus item = list.get(position);
-        holder.tv.setText(item.funcName);
+
+        // 从 IconFunc 枚举中准确获取功能展示名称
+        String title = "";
+        for (IconFunc func : IconFunc.values()) {
+            if (func.funcId == item.iconFuncId) {
+                title = func.funcName;
+                break;
+            }
+        }
+        holder.tv.setText(title);
+
         holder.status.setOnCheckedChangeListener(null);
         holder.status.setChecked(item.active);
         holder.status.setOnCheckedChangeListener((buttonView, isChecked) -> {
             item.active = isChecked;
-            IconFuncDao.saveIconFunc(context, list);
+            // 对齐 IconFuncDao 原生单项保存方法
+            IconFuncDao.save(context, item);
         });
 
         if (holder.dragButton != null) {
