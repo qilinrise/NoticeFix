@@ -12,18 +12,18 @@
     android:paddingBottom="12dp"
     android:background="?attr/selectableItemBackground">
 
-    <!-- 拖拽图标 -->
+    <!-- 修复：ID 对齐代码中的 icon_config_content_order -->
     <ImageView
-        android:id="@+id/icon_func_drag"
+        android:id="@+id/icon_config_content_order"
         android:layout_width="24dp"
         android:layout_height="24dp"
         android:contentDescription="@null"
         android:src="@drawable/ic_drag_handle"
         app:tint="?android:attr/textColorSecondary" />
 
-    <!-- 功能名称 -->
+    <!-- 修复：ID 对齐代码中的 icon_config_content -->
     <TextView
-        android:id="@+id/icon_func_name"
+        android:id="@+id/icon_config_content"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
@@ -32,9 +32,9 @@
         android:textColor="?android:attr/textColorPrimary"
         android:textSize="15sp" />
 
-    <!-- 现代滑动开关（自带完整轨道与滑块，兼容所有版本） -->
+    <!-- 修复：ID 对齐代码中的 icon_config_switchCompat -->
     <androidx.appcompat.widget.SwitchCompat
-        android:id="@+id/icon_func_switch"
+        android:id="@+id/icon_config_switchCompat"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
 
