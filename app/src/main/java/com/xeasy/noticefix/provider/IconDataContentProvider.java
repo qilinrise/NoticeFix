@@ -38,7 +38,7 @@ public class IconDataContentProvider extends ContentProvider {
 
     @Override
     public boolean onCreate() {
-        // 保持纯净启动，绝不在主进程创建阶段抛出未捕获异常
+        // 保持纯净：绝不在此处执行读写操作，杜绝拉起进程时崩溃
         return true;
     }
 
@@ -50,9 +50,6 @@ public class IconDataContentProvider extends ContentProvider {
         MatrixCursor matrixCursor = new MatrixCursor(new String[]{"globalConfig", "iconFunc", "libIconList", "customIconList"});
 
         try {
-            if (GlobalConfigDao.globalConfigDao == null && getContext() != null) {
-                GlobalConfigDao.initGlobalConfig(getContext());
-            }
             GlobalConfigDao globalConfigDao = GlobalConfigDao.globalConfigDao;
             if (globalConfigDao != null) {
                 globalConfigDao.read = true;
