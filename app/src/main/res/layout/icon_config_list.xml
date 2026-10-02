@@ -1,46 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="60dp"
-    >
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="12dp"
+    android:background="?attr/selectableItemBackground">
 
+    <!-- 拖拽手柄图标 -->
     <ImageView
-        android:id="@+id/icon_config_content_order"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
-        android:padding="15dp"
-        android:layout_marginBottom="8dp"
-        android:layout_marginStart="5dp"
-        android:layout_marginTop="8dp"
-        android:src="@mipmap/order"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        />
+        android:id="@+id/icon_func_drag"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:contentDescription="@null"
+        android:src="@drawable/ic_drag_handle"
+        app:tint="?android:attr/textColorSecondary" />
 
+    <!-- 功能名称 -->
     <TextView
-        android:id="@+id/icon_config_content"
-        android:layout_width="wrap_content"
+        android:id="@+id/icon_func_name"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:layout_marginTop="8dp"
-        android:text="@string/app_filter_custom_icon"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/icon_config_content_order"
-        app:layout_constraintTop_toTopOf="parent"/>
+        android:layout_weight="1"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="15sp" />
 
-    <androidx.appcompat.widget.SwitchCompat
-        android:id="@+id/icon_config_switchCompat"
+    <!-- Material 3 大药丸开关 -->
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/icon_func_switch"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:layout_marginEnd="5dp"
-        android:layout_marginTop="8dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        />
+        android:layout_height="wrap_content" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</LinearLayout>
