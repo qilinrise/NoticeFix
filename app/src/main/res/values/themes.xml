@@ -1,23 +1,14 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- 日间模式基础主题 -->
-    <style name="Theme.NoticeFix" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
-        <item name="colorPrimary">?attr/colorPrimary</item>
-        <item name="colorPrimaryVariant">?attr/colorPrimaryVariant</item>
-        <item name="colorOnPrimary">@android:color/white</item>
-        <item name="colorSecondary">?attr/colorSecondary</item>
-        <item name="colorSecondaryVariant">?attr/colorSecondaryVariant</item>
-        <item name="colorOnSecondary">@android:color/black</item>
-        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
-    </style>
+    <!-- 基础应用主题：升级为 Material 3，激活莫奈动态取色与现代控件样式 -->
+    <style name="Theme.NoticeFix" parent="Theme.Material3.DayNight.NoActionBar" />
 
-    <!-- 解决 MaterialCardView 缺失属性闪退问题 -->
-    <style name="Theme.NoticeFix.NoActionBar" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.NoticeFix.NoActionBar" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
     </style>
 
-    <!-- 补齐布局与菜单所需的 Overlay 样式 -->
-    <style name="Theme.NoticeFix.AppBarOverlay" parent="ThemeOverlay.MaterialComponents.Dark.ActionBar" />
+    <style name="Theme.AppCompat.Empty" parent="Theme.Material3.DayNight.NoActionBar" />
 
+    <style name="Theme.NoticeFix.AppBarOverlay" parent="ThemeOverlay.MaterialComponents.Dark.ActionBar" />
     <style name="Theme.NoticeFix.PopupOverlay" parent="ThemeOverlay.MaterialComponents.Light" />
 </resources>
