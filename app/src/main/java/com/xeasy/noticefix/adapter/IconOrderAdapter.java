@@ -38,7 +38,6 @@ public class IconOrderAdapter extends RecyclerView.Adapter<IconOrderAdapter.View
                 int toPosition = target.getAdapterPosition();
                 Collections.swap(list, fromPosition, toPosition);
                 notifyItemMoved(fromPosition, toPosition);
-                // 对齐 IconFuncDao 原生交换顺序方法
                 IconFuncDao.saveSwap(context, fromPosition, toPosition);
                 return true;
             }
@@ -63,13 +62,16 @@ public class IconOrderAdapter extends RecyclerView.Adapter<IconOrderAdapter.View
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         IconFuncDao.IconFuncStatus item = list.get(position);
 
-        // 从 IconFunc 枚举中准确获取功能展示名称
-        String title = "";
-        for (IconFunc func : IconFunc.values()) {
-            if (func.funcId == item.iconFuncId) {
-                title = func.funcName;
-                break;
-            }
+        // 使用已有的枚举常量 funcId 安全匹配名称，不依赖任何未知变量
+        String title;
+        if (item.iconFuncId == IconFunc.LIB_FIX.funcId) {
+            title = "图标库";
+        } else if (item.iconFuncId == IconFunc.CUSTOM_FIX.funcId) {
+            title = "自定义图标";
+        } else if (item.iconFuncId == IconFunc.AUTO_FIX.funcId) {
+            title = "提取算法";
+        } else {
+            title = "功能 " + item.iconFuncId;
         }
         holder.tv.setText(title);
 
@@ -77,7 +79,6 @@ public class IconOrderAdapter extends RecyclerView.Adapter<IconOrderAdapter.View
         holder.status.setChecked(item.active);
         holder.status.setOnCheckedChangeListener((buttonView, isChecked) -> {
             item.active = isChecked;
-            // 对齐 IconFuncDao 原生单项保存方法
             IconFuncDao.save(context, item);
         });
 
