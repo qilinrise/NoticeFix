@@ -38,9 +38,7 @@ public class IconDataContentProvider extends ContentProvider {
 
     @Override
     public boolean onCreate() {
-        if (getContext() != null) {
-            GlobalConfigDao.initGlobalConfig(getContext());
-        }
+        // 保持纯净启动，绝不在主进程创建阶段抛出未捕获异常
         return true;
     }
 
@@ -51,25 +49,27 @@ public class IconDataContentProvider extends ContentProvider {
                         String[] selectionArgs, String sortOrder) {
         MatrixCursor matrixCursor = new MatrixCursor(new String[]{"globalConfig", "iconFunc", "libIconList", "customIconList"});
 
-        // 核心修复：后台每次被查询时，强制从磁盘读取最新配置，绝不等待手动打开 Activity
-        if (getContext() != null) {
-            GlobalConfigDao.initGlobalConfig(getContext());
-        }
-        GlobalConfigDao globalConfigDao = GlobalConfigDao.globalConfigDao;
-        if (globalConfigDao != null) {
-            globalConfigDao.read = true;
-        }
+        try {
+            if (GlobalConfigDao.globalConfigDao == null && getContext() != null) {
+                GlobalConfigDao.initGlobalConfig(getContext());
+            }
+            GlobalConfigDao globalConfigDao = GlobalConfigDao.globalConfigDao;
+            if (globalConfigDao != null) {
+                globalConfigDao.read = true;
+            }
 
-        List<IconFuncDao.IconFuncStatus> iconFunc = IconFuncDao.getIconFunc(getContext());
-        Map<String, IconLibBean> iconLib = IconLibDao.getIconLib(getContext(), true);
-        Map<String, CustomIconBean> allCustomIcons = CustomIconDao.getAllCustomIcons(getContext());
+            List<IconFuncDao.IconFuncStatus> iconFunc = IconFuncDao.getIconFunc(getContext());
+            Map<String, IconLibBean> iconLib = IconLibDao.getIconLib(getContext(), true);
+            Map<String, CustomIconBean> allCustomIcons = CustomIconDao.getAllCustomIcons(getContext());
 
-        matrixCursor.addRow(new Object[]{
-                gson.toJson(globalConfigDao),
-                gson.toJson(iconFunc),
-                gson.toJson(iconLib),
-                gson.toJson(allCustomIcons)
-        });
+            matrixCursor.addRow(new Object[]{
+                    gson.toJson(globalConfigDao),
+                    gson.toJson(iconFunc),
+                    gson.toJson(iconLib),
+                    gson.toJson(allCustomIcons)
+            });
+        } catch (Exception ignored) {
+        }
         return matrixCursor;
     }
 
