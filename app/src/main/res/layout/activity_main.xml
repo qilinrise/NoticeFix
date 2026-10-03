@@ -38,14 +38,14 @@
             android:paddingHorizontal="16dp"
             android:paddingTop="8dp">
 
-            <!-- 模块状态信息卡片（对齐系统设置的深灰容器底色 #1E1F22） -->
+            <!-- 模块状态信息卡片（使用 M3 自适应容器色：浅色模式为浅灰，深色模式为深灰） -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
                 app:cardCornerRadius="24dp"
                 app:cardElevation="0dp"
-                app:cardBackgroundColor="#1E1F22">
+                app:cardBackgroundColor="?attr/colorSurfaceVariant">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -58,13 +58,13 @@
                         android:layout_height="wrap_content"
                         android:text="@string/application_introduction"
                         android:textSize="14sp"
-                        android:textColor="?android:attr/textColorSecondary" />
+                        android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginVertical="12dp"
-                        android:background="#33808080" />
+                        android:background="?attr/colorOutlineVariant" />
 
                     <TextView
                         android:id="@+id/xposed_status"
@@ -73,20 +73,20 @@
                         android:text="@string/xposed_status"
                         android:textSize="16sp"
                         android:textStyle="bold"
-                        android:textColor="?android:attr/textColorPrimary" />
+                        android:textColor="?attr/colorOnSurface" />
 
                 </LinearLayout>
 
             </androidx.cardview.widget.CardView>
 
-            <!-- 图标设置卡片 -->
+            <!-- 图标设置卡片（自适应容器色，彻底告别死黑色块） -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="20dp"
                 app:cardCornerRadius="24dp"
                 app:cardElevation="0dp"
-                app:cardBackgroundColor="#1E1F22">
+                app:cardBackgroundColor="?attr/colorSurfaceVariant">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -102,7 +102,7 @@
                         android:text="@string/icon_setting"
                         android:textSize="16sp"
                         android:textStyle="bold"
-                        android:textColor="?android:attr/textColorPrimary" />
+                        android:textColor="?attr/colorOnSurface" />
 
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/main_recyclerView"
@@ -115,7 +115,7 @@
 
             </androidx.cardview.widget.CardView>
 
-            <!-- 主按钮：自动从系统壁纸提取主色，随壁纸实时变化 -->
+            <!-- 主按钮：Material 3 标准胶囊按钮 -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/custom_icon_config"
                 android:layout_width="match_parent"
@@ -125,10 +125,10 @@
                 android:textSize="15sp"
                 app:cornerRadius="28dp" />
 
-            <!-- 次按钮：自动跟随系统莫奈强调色边框与文字 -->
+            <!-- 次按钮：Material 3 边框按钮 -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/view_icon_lib"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 android:layout_marginBottom="24dp"
@@ -144,7 +144,7 @@
                 android:paddingHorizontal="24dp"
                 android:text="@string/app_main_tips"
                 android:textSize="12sp"
-                android:textColor="?android:attr/textColorSecondary" />
+                android:textColor="?attr/colorOutline" />
 
         </LinearLayout>
 
