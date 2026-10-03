@@ -1,10 +1,12 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- 夜间模式 Material 3 主题 -->
     <style name="Theme.NoticeFix" parent="Theme.Material3.DayNight.NoActionBar" />
 
     <style name="Theme.NoticeFix.NoActionBar" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
+        <!-- 夜间模式状态栏文字与图标保持亮色（白字） -->
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
     </style>
 
     <style name="Theme.AppCompat.Empty" parent="Theme.Material3.DayNight.NoActionBar" />
