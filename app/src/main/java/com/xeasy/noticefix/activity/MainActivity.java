@@ -4,6 +4,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -16,6 +17,8 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -36,9 +39,15 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // 核心：在初始化前注入系统莫奈动态取色（完美对齐系统设置色彩）
         DynamicColors.applyToActivityIfAvailable(this);
         super.onCreate(savedInstanceState);
+
+        // 核心修复：根据当前日夜模式动态控制状态栏图标反色（白昼深色字，黑夜浅色字）
+        boolean isNight = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        if (insetsController != null) {
+            insetsController.setAppearanceLightStatusBars(!isNight);
+        }
 
         try {
             binding = ActivityMainBinding.inflate(getLayoutInflater());
@@ -94,10 +103,10 @@ public class MainActivity extends AppCompatActivity {
         if (status != null) {
             if (active) {
                 status.setText(getString(R.string.xposed_status, getString(R.string.yes)));
-                status.setTextColor(getColor(android.R.color.holo_green_light));
+                status.setTextColor(0xFF2E7D32); // 规范深绿色，日间与夜间模式均清晰可辨
             } else {
                 status.setText(getString(R.string.xposed_status, getString(R.string.no)));
-                status.setTextColor(getColor(android.R.color.holo_red_light));
+                status.setTextColor(0xFFC62828); // 规范深红色
             }
         }
     }
