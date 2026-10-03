@@ -4,6 +4,7 @@ import static com.xeasy.noticefix.constant.MyConstant.GLOBAL_CONFIG_FILE;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
 
 import com.google.gson.Gson;
 import com.xeasy.noticefix.utils.AppNotification;
@@ -14,7 +15,7 @@ import de.robv.android.xposed.XSharedPreferences;
 
 public class GlobalConfigDao {
     /**
-     * 是否已被systemui读
+     * 是否已被 systemui 读
      */
     public boolean read = false;
     /**
@@ -26,7 +27,7 @@ public class GlobalConfigDao {
      */
     public boolean alwaysHandleProxyNotice = true;
     /**
-     * 是否跳过灰度（核心修复 1：默认值直接设为 true，开机未解锁或读取延迟时绝不误伤系统灰度图标）
+     * 是否跳过灰度（默认保持开启，避免开机读取间隙误伤系统单色图标）
      */
     public boolean skipGrayscale = true;
     /**
@@ -48,19 +49,33 @@ public class GlobalConfigDao {
 
     public static final Gson gson = new Gson();
 
+    /**
+     * 获取支持 Direct Boot 的安全 Context（DE 空间，开机未解锁即可直接读取）
+     */
+    private static Context getSafeContext(Context context) {
+        if (context == null) return null;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            return context.isDeviceProtectedStorage() ? context : context.createDeviceProtectedStorageContext();
+        }
+        return context;
+    }
+
     public static void initGlobalConfig(Context context) {
         if (context == null) return;
         try {
+            Context safeContext = getSafeContext(context);
             SharedPreferences sharedPreferences;
-            if (context.getPackageName().equals("com.xeasy.noticefix")) {
-                sharedPreferences = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE);
+
+            if (safeContext.getPackageName().equals("com.xeasy.noticefix")) {
+                sharedPreferences = safeContext.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE);
             } else {
+                // SystemUI 注入进程优先从 DE 路径构建 XSharedPreferences
                 XSharedPreferences xSharedPreferences = new XSharedPreferences("com.xeasy.noticefix", FILE_NAME);
                 xSharedPreferences.makeWorldReadable();
-                // 核心修复 2：每次初始化强制刷新磁盘数据，彻底清除开机时的空缓存
                 xSharedPreferences.reload();
                 sharedPreferences = xSharedPreferences;
             }
+
             String string = sharedPreferences.getString(FILE_NAME, null);
             if (string != null && !string.trim().isEmpty()) {
                 GlobalConfigDao loaded = gson.fromJson(string, GlobalConfigDao.class);
@@ -79,12 +94,26 @@ public class GlobalConfigDao {
             if (config != null) {
                 globalConfigDao = config;
             }
-            SharedPreferences sharedPreferences = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE);
+            Context safeContext = getSafeContext(context);
+
+            // 同时向 DE 空间写入配置，确保冷启动与日常读写双重保障
+            SharedPreferences sharedPreferences = safeContext.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE);
             sharedPreferences.edit().putString(FILE_NAME, gson.toJson(globalConfigDao)).commit();
 
-            // 核心修复 3：递归放行父级目录穿透权限（rwxr-xr-x），确保 SystemUI 在任何时候都能直接读取
+            // 针对常规 CE 存储同步一份备份
             try {
-                File dataDir = context.getFilesDir().getParentFile();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && safeContext.isDeviceProtectedStorage()) {
+                    context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+                            .edit()
+                            .putString(FILE_NAME, gson.toJson(globalConfigDao))
+                            .commit();
+                }
+            } catch (Exception ignored) {
+            }
+
+            // 穿透放行 DE 存储与配置文件的 Linux 全局读取权限
+            try {
+                File dataDir = safeContext.getFilesDir().getParentFile();
                 if (dataDir != null) {
                     dataDir.setReadable(true, false);
                     dataDir.setExecutable(true, false);
@@ -103,7 +132,7 @@ public class GlobalConfigDao {
             } catch (Exception ignored) {
             }
 
-            // 发送刷新通知
+            // 发送刷新广播通知
             AppNotification.sendFlashNoticeMessage(context, null);
         } catch (Exception e) {
             e.printStackTrace();
