@@ -26,9 +26,9 @@ public class GlobalConfigDao {
      */
     public boolean alwaysHandleProxyNotice = true;
     /**
-     * 是否跳过灰度
+     * 是否跳过灰度（核心修复 1：默认值直接设为 true，开机未解锁或读取延迟时绝不误伤系统灰度图标）
      */
-    public boolean skipGrayscale = false;
+    public boolean skipGrayscale = true;
     /**
      * 解除原生安卓色彩
      */
@@ -57,6 +57,8 @@ public class GlobalConfigDao {
             } else {
                 XSharedPreferences xSharedPreferences = new XSharedPreferences("com.xeasy.noticefix", FILE_NAME);
                 xSharedPreferences.makeWorldReadable();
+                // 核心修复 2：每次初始化强制刷新磁盘数据，彻底清除开机时的空缓存
+                xSharedPreferences.reload();
                 sharedPreferences = xSharedPreferences;
             }
             String string = sharedPreferences.getString(FILE_NAME, null);
@@ -78,14 +80,25 @@ public class GlobalConfigDao {
                 globalConfigDao = config;
             }
             SharedPreferences sharedPreferences = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE);
-            // 核心修复：改用 commit() 强制同步写入磁盘，避免划掉后台时丢失数据
             sharedPreferences.edit().putString(FILE_NAME, gson.toJson(globalConfigDao)).commit();
 
-            // 保持配置文件的可读权限，确保 SystemUI 与 Xposed 顺利读取
+            // 核心修复 3：递归放行父级目录穿透权限（rwxr-xr-x），确保 SystemUI 在任何时候都能直接读取
             try {
-                File file = new File(context.getFilesDir().getParent(), "shared_prefs/" + FILE_NAME + ".xml");
-                if (file.exists()) {
-                    file.setReadable(true, false);
+                File dataDir = context.getFilesDir().getParentFile();
+                if (dataDir != null) {
+                    dataDir.setReadable(true, false);
+                    dataDir.setExecutable(true, false);
+
+                    File spDir = new File(dataDir, "shared_prefs");
+                    if (spDir.exists()) {
+                        spDir.setReadable(true, false);
+                        spDir.setExecutable(true, false);
+
+                        File file = new File(spDir, FILE_NAME + ".xml");
+                        if (file.exists()) {
+                            file.setReadable(true, false);
+                        }
+                    }
                 }
             } catch (Exception ignored) {
             }
