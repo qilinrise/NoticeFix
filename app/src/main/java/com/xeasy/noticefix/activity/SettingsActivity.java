@@ -18,8 +18,8 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.SwitchCompat;
 
+import com.google.android.material.materialswitch.MaterialSwitch;
 import com.xeasy.noticefix.R;
 import com.xeasy.noticefix.dao.GlobalConfigDao;
 import com.xeasy.noticefix.dao.IconLibDao;
@@ -41,79 +41,76 @@ public class SettingsActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // 核心修复：进入页面第一时间从本地磁盘载入真实保存的配置数据
+        GlobalConfigDao.initGlobalConfig(this);
+
         binding = SettingsActivityBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+
         // 菜单栏
         setSupportActionBar(binding.toolbar);
-        //关键下面两句话，设置了回退按钮，及点击事件的效果
-        Objects.requireNonNull(getSupportActionBar()).setDisplayHomeAsUpEnabled(true);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
         // 返回箭头
         binding.toolbar.setNavigationOnClickListener(v -> finish());
 
-        // 调试模式开关
-        SwitchCompat debugModeSwitchCompat = findViewById(R.id.debug_mode);
-        debugModeSwitchCompat.setChecked(GlobalConfigDao.globalConfigDao.debugMode);
-        debugModeSwitchCompat.setOnClickListener((v) -> {
-            boolean isChecked = debugModeSwitchCompat.isChecked();
-            if ( isChecked ) {
-                debugModeSwitchCompat.setChecked(false);
-                reqPass();
+        // 1. 调试模式开关
+        MaterialSwitch debugModeSwitch = findViewById(R.id.debug_mode);
+        debugModeSwitch.setChecked(GlobalConfigDao.globalConfigDao.debugMode);
+        debugModeSwitch.setOnClickListener((v) -> {
+            boolean isChecked = debugModeSwitch.isChecked();
+            if (isChecked) {
+                debugModeSwitch.setChecked(false);
+                reqPass(debugModeSwitch);
             }
-
         });
-        // 保存
-        debugModeSwitchCompat.setOnCheckedChangeListener((buttonView, isChecked) -> {
+        debugModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             GlobalConfigDao.globalConfigDao.debugMode = isChecked;
             GlobalConfigDao.saveConfig(SettingsActivity.this, GlobalConfigDao.globalConfigDao);
         });
-        // 跳过灰度开关
-        SwitchCompat skipGrayscaleIconSwitchCompat = findViewById(R.id.skip_grayscale_icon);
-        skipGrayscaleIconSwitchCompat.setChecked(GlobalConfigDao.globalConfigDao.skipGrayscale);
-        skipGrayscaleIconSwitchCompat.setOnCheckedChangeListener((btn, isChecked) -> {
-            GlobalConfigDao.globalConfigDao.skipGrayscale = isChecked;
-            GlobalConfigDao.saveConfig(this, GlobalConfigDao.globalConfigDao);
-        });
-        // 始终处理推送 开关
-        SwitchCompat alwaysHandleProxyNoticeCompat = findViewById(R.id.always_handle_proxy_notice);
-        alwaysHandleProxyNoticeCompat.setChecked(GlobalConfigDao.globalConfigDao.alwaysHandleProxyNotice);
-        alwaysHandleProxyNoticeCompat.setOnCheckedChangeListener((btn, isChecked) -> {
+
+        // 2. 始终处理推送开关
+        MaterialSwitch alwaysHandleProxyNoticeSwitch = findViewById(R.id.always_handle_proxy_notice);
+        alwaysHandleProxyNoticeSwitch.setChecked(GlobalConfigDao.globalConfigDao.alwaysHandleProxyNotice);
+        alwaysHandleProxyNoticeSwitch.setOnCheckedChangeListener((btn, isChecked) -> {
             GlobalConfigDao.globalConfigDao.alwaysHandleProxyNotice = isChecked;
             GlobalConfigDao.saveConfig(this, GlobalConfigDao.globalConfigDao);
         });
-        // 解除彩色开关
-        SwitchCompat showColoredIconsSwitchCompat = findViewById(R.id.show_colored_icons);
-        showColoredIconsSwitchCompat.setChecked(GlobalConfigDao.globalConfigDao.showColoredIcons);
-        showColoredIconsSwitchCompat.setOnCheckedChangeListener((btn, isChecked) -> {
+
+        // 3. 跳过灰度开关
+        MaterialSwitch skipGrayscaleIconSwitch = findViewById(R.id.skip_grayscale_icon);
+        skipGrayscaleIconSwitch.setChecked(GlobalConfigDao.globalConfigDao.skipGrayscale);
+        skipGrayscaleIconSwitch.setOnCheckedChangeListener((btn, isChecked) -> {
+            GlobalConfigDao.globalConfigDao.skipGrayscale = isChecked;
+            GlobalConfigDao.saveConfig(this, GlobalConfigDao.globalConfigDao);
+        });
+
+        // 4. 解除彩色开关
+        MaterialSwitch showColoredIconsSwitch = findViewById(R.id.show_colored_icons);
+        showColoredIconsSwitch.setChecked(GlobalConfigDao.globalConfigDao.showColoredIcons);
+        showColoredIconsSwitch.setOnCheckedChangeListener((btn, isChecked) -> {
             GlobalConfigDao.globalConfigDao.showColoredIcons = isChecked;
             GlobalConfigDao.saveConfig(this, GlobalConfigDao.globalConfigDao);
         });
-        // 展开通知 开关
-        SwitchCompat expandAllNoticeSwitchCompat = findViewById(R.id.expand_all_notice);
-        expandAllNoticeSwitchCompat.setChecked(GlobalConfigDao.globalConfigDao.expandAllNotice);
-        expandAllNoticeSwitchCompat.setOnCheckedChangeListener((btn, isChecked) -> {
+
+        // 5. 展开通知开关
+        MaterialSwitch expandAllNoticeSwitch = findViewById(R.id.expand_all_notice);
+        expandAllNoticeSwitch.setChecked(GlobalConfigDao.globalConfigDao.expandAllNotice);
+        expandAllNoticeSwitch.setOnCheckedChangeListener((btn, isChecked) -> {
             GlobalConfigDao.globalConfigDao.expandAllNotice = isChecked;
             GlobalConfigDao.saveConfig(this, GlobalConfigDao.globalConfigDao);
         });
-//        // 自定义图标帮助
-//        SwitchCompat customIconHelperSwitchCompat = findViewById(R.id.custom_icon_helper);
-//        customIconHelperSwitchCompat.setChecked(GlobalConfigDao.globalConfigDao.customIconHelper);
-//        customIconHelperSwitchCompat.setOnCheckedChangeListener((btn, isChecked) -> {
-//            GlobalConfigDao.globalConfigDao.customIconHelper = isChecked;
-//            GlobalConfigDao.saveConfig(this, GlobalConfigDao.globalConfigDao);
-//        });
+
         // 上传图标包
         ImageView updateIconLibrary = findViewById(R.id.update_icon_library);
 
-        // 选取图标包的回调
         ActivityResultLauncher<Intent> intentActivityResultLauncher = SettingsActivity.this.registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(), result -> {
-                    //此处是跳转的result回调方法
-                    System.out.println(result);
                     Intent data = result.getData();
-                    // 没选取照片时不做任何操作
                     if (data != null && data.getData() != null && result.getResultCode() == Activity.RESULT_OK) {
-                        Uri selectedImage = data.getData(); //获取系统返回的照片的Uri
-
+                        Uri selectedImage = data.getData();
                         String fileAbsolutePath = GetFilePathFromUri.getFileAbsolutePath(SettingsActivity.this, selectedImage);
                         try {
                             IconLibDao.readAndInitIconLib(SettingsActivity.this, new FileInputStream(fileAbsolutePath));
@@ -124,20 +121,18 @@ public class SettingsActivity extends AppCompatActivity {
                 });
 
         updateIconLibrary.setOnClickListener(v -> {
-
             Callable<Objects> callable = () -> {
                 Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-                intent.setType("application/json");//json 类型
+                intent.setType("application/json");
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intentActivityResultLauncher.launch(intent);
                 return null;
             };
-            if ( Build.VERSION.SDK_INT > Build.VERSION_CODES.S_V2 ) {
+            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.S_V2) {
                 PermissionsUtil.reqPermission(this, Manifest.permission.READ_MEDIA_IMAGES, callable);
             } else {
                 PermissionsUtil.reqPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE, callable);
             }
-
         });
 
         ImageView refreshIconLibrary = findViewById(R.id.refresh_icon_library);
@@ -145,39 +140,32 @@ public class SettingsActivity extends AppCompatActivity {
         objectAnimator.setDuration(1000);
         objectAnimator.setRepeatCount(INFINITE);
         refreshIconLibrary.setOnClickListener(v -> {
-            // 在线刷新图标库按钮
             if (GlobalConfigDao.globalConfigDao.debugMode) {
                 objectAnimator.start();
-                TaskUtils.createTask(()->IconLibDao.refreshIconLibOnLine(SettingsActivity.this, objectAnimator));
+                TaskUtils.createTask(() -> IconLibDao.refreshIconLibOnLine(SettingsActivity.this, objectAnimator));
             } else {
                 Toast.makeText(SettingsActivity.this, getString(R.string.function_not_open), Toast.LENGTH_SHORT).show();
             }
         });
-
-
     }
 
-
-    private void reqPass() {
+    private void reqPass(MaterialSwitch switchView) {
         final EditText inputServer = new EditText(this);
-
         inputServer.setFilters(new InputFilter[]{new InputFilter.LengthFilter(50)});
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setCancelable(false);
-        SwitchCompat viewById = findViewById(R.id.debug_mode);
         builder.setTitle("暗号?").setIcon(android.R.drawable.ic_dialog_info).setView(inputServer)
-                .setNegativeButton(getString(R.string.cancel), (dialog, which) -> viewById.setChecked(false));
+                .setNegativeButton(getString(R.string.cancel), (dialog, which) -> switchView.setChecked(false));
         builder.setPositiveButton(getString(R.string.submit), (dialog, which) -> {
-            String _sign = inputServer.getText().toString();
-            if (_sign.equals("easy") || _sign.equals("星夜不荟") ) {
-                    viewById.setChecked(true);
-                } else {
-                    Toast.makeText(SettingsActivity.this, "暗号错误", Toast.LENGTH_SHORT).show();
-                    viewById.setChecked(false);
-                }
+            String sign = inputServer.getText().toString();
+            if (sign.equals("easy") || sign.equals("星夜不荟")) {
+                switchView.setChecked(true);
+            } else {
+                Toast.makeText(SettingsActivity.this, "暗号错误", Toast.LENGTH_SHORT).show();
+                switchView.setChecked(false);
+            }
         });
         builder.show();
     }
-
 }
