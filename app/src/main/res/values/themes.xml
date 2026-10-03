@@ -1,10 +1,13 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- 基础应用主题：升级为 Material 3，激活莫奈动态取色与现代控件样式 -->
+    <!-- 基础应用主题 -->
     <style name="Theme.NoticeFix" parent="Theme.Material3.DayNight.NoActionBar" />
 
     <style name="Theme.NoticeFix.NoActionBar" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
+        <!-- 核心修复：浅色模式下状态栏文字与图标强制反色为深色（黑字） -->
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
     </style>
 
     <style name="Theme.AppCompat.Empty" parent="Theme.Material3.DayNight.NoActionBar" />
