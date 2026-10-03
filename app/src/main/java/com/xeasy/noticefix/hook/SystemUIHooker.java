@@ -4,7 +4,6 @@ import static com.xeasy.noticefix.hook.HookConstant.gson;
 
 import android.annotation.SuppressLint;
 import android.app.AndroidAppHelper;
-import android.app.Application;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.content.ContentResolver;
@@ -19,7 +18,6 @@ import android.net.Uri;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 import android.util.LruCache;
-import android.view.View;
 import android.widget.RemoteViews;
 
 import com.google.gson.reflect.TypeToken;
@@ -44,6 +42,7 @@ import java.util.stream.Collectors;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
+import de.robv.android.xposed.XSharedPreferences;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
@@ -52,10 +51,32 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
 
     private static final String LOG_PREV = "NoticeFix---";
 
-    // 内存缓存：同一应用图标秒级复用，杜绝卡顿
+    // 内存缓存：同一应用图标秒级复用
     private static final LruCache<String, Icon> sIconCache = new LruCache<>(80);
     // IPC 节流时间戳
     private static long sLastReadConfigTime = 0;
+
+    /**
+     * 系统包名判定（核心防御：系统核心通知永不处理，绝不误伤原生底衬）
+     */
+    public static boolean isSystemPackage(String packageName) {
+        if (packageName == null || packageName.trim().isEmpty()) {
+            return false;
+        }
+        return "android".equals(packageName)
+                || "com.android.systemui".equals(packageName)
+                || "com.google.android.systemui".equals(packageName)
+                || packageName.startsWith("com.android.internal");
+    }
+
+    private static Context getContextFromBuilder(Object builder) {
+        if (builder == null) return null;
+        try {
+            return (Context) XposedHelpers.getObjectField(builder, "mContext");
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam loadPackageParam) {
@@ -135,18 +156,47 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
             XposedBridge.hookMethod(methodsByExactParameters, new XC_MethodHook() {
                 @Override
                 protected void afterHookedMethod(MethodHookParam param) {
-                    // 彻底删除无条件给单色图标打 pre_L 的逻辑，允许系统深浅色变色机制接管
                 }
             });
         }
 
-        // 彻底删除对 updateIconColor 强行设置 0 的拦截，保证系统 DarkIconDispatcher 变色通道完全畅通
         final Class<?> standardTemplateParamsClass = XposedHelpers.findClass("android.app.Notification.StandardTemplateParams", classLoader);
         XposedHelpers.findAndHookMethod(Notification.Builder.class, "processSmallIconColor",
                 Icon.class, RemoteViews.class, standardTemplateParamsClass,
                 new XC_MethodHook() {
                     @Override
                     protected void beforeHookedMethod(MethodHookParam param) {
+                        Context context = getContextFromBuilder(param.thisObject);
+                        String pkgName = context != null ? context.getPackageName() : null;
+
+                        // 1. 系统底层包（android / systemui）直接放行，完整保留系统深色圆形底衬
+                        if (isSystemPackage(pkgName)) {
+                            return;
+                        }
+
+                        // 2. 检查用户是否单独配置了“不处理此应用”
+                        if (pkgName != null && HookConstant.customIconBeanMap != null) {
+                            CustomIconBean customIconBean = HookConstant.customIconBeanMap.get(pkgName);
+                            if (customIconBean != null && customIconBean.noHandle) {
+                                return;
+                            }
+                        }
+
+                        // 3. 跳过灰度图标配置：若检测到单色矢量图标，保留原生底衬与着色
+                        if (HookConstant.globalConfigDao != null && HookConstant.globalConfigDao.skipGrayscale) {
+                            Icon icon = (Icon) param.args[0];
+                            if (icon != null && context != null) {
+                                try {
+                                    Bitmap bitmap = getBitmap4Icon(icon, context);
+                                    if (bitmap != null && new ImageUtils().isGrayscale(bitmap)) {
+                                        return;
+                                    }
+                                } catch (Throwable ignored) {
+                                }
+                            }
+                        }
+
+                        // 仅对未适配的彩色应用剔除系统着色
                         if (HookConstant.globalConfigDao != null && HookConstant.globalConfigDao.read && HookConstant.globalConfigDao.showColoredIcons) {
                             RemoteViews contentView = (RemoteViews) param.args[1];
                             if (contentView != null) {
@@ -158,6 +208,38 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
 
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) {
+                        // 若 before 中未拦截（被放行），after 不执行任何去底衬操作
+                        if (!param.hasThrowable() && param.getResult() == null) {
+                            return;
+                        }
+
+                        Context context = getContextFromBuilder(param.thisObject);
+                        String pkgName = context != null ? context.getPackageName() : null;
+
+                        if (isSystemPackage(pkgName)) {
+                            return;
+                        }
+
+                        if (pkgName != null && HookConstant.customIconBeanMap != null) {
+                            CustomIconBean customIconBean = HookConstant.customIconBeanMap.get(pkgName);
+                            if (customIconBean != null && customIconBean.noHandle) {
+                                return;
+                            }
+                        }
+
+                        if (HookConstant.globalConfigDao != null && HookConstant.globalConfigDao.skipGrayscale) {
+                            Icon icon = (Icon) param.args[0];
+                            if (icon != null && context != null) {
+                                try {
+                                    Bitmap bitmap = getBitmap4Icon(icon, context);
+                                    if (bitmap != null && new ImageUtils().isGrayscale(bitmap)) {
+                                        return;
+                                    }
+                                } catch (Throwable ignored) {
+                                }
+                            }
+                        }
+
                         if (HookConstant.globalConfigDao != null && HookConstant.globalConfigDao.read && HookConstant.globalConfigDao.showColoredIcons) {
                             RemoteViews contentView = (RemoteViews) param.args[1];
                             if (contentView != null) {
@@ -185,6 +267,9 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                         Object mEntry = ReflexUtil.getField4Obj(param.thisObject, "mEntry");
                         Object mSbn = ReflexUtil.getField4Obj(mEntry, "mSbn");
                         String pkg = (String) ReflexUtil.getField4Obj(mSbn, "pkg");
+                        if (isSystemPackage(pkg)) {
+                            return;
+                        }
                         CustomIconBean customIconBean = HookConstant.customIconBeanMap != null ? HookConstant.customIconBeanMap.get(pkg) : null;
                         if (HookConstant.globalConfigDao.expandAllNotice || (customIconBean != null && customIconBean.expandStatusBar)) {
                             param.args[0] = true;
@@ -206,7 +291,7 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) {
                 long now = System.currentTimeMillis();
-                if ((HookConstant.globalConfigDao == null || !HookConstant.globalConfigDao.read) && (now - sLastReadConfigTime > 5000)) {
+                if ((HookConstant.globalConfigDao == null || !HookConstant.globalConfigDao.read) && (now - sLastReadConfigTime > 3000)) {
                     sLastReadConfigTime = now;
                     readConfigOld(AndroidAppHelper.currentApplication());
                 }
@@ -216,7 +301,9 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                             StatusBarNotification statusBarNotification = (StatusBarNotification) ReflexUtil.getField4ObjByClass(arg.getClass(), arg, StatusBarNotification.class);
                             Context mContext = (Context) ReflexUtil.getField4Obj(param.thisObject, "mContext");
                             if (statusBarNotification != null && mContext != null) {
-                                fixNotificationIcon(statusBarNotification, mContext);
+                                if (!isSystemPackage(statusBarNotification.getPackageName())) {
+                                    fixNotificationIcon(statusBarNotification, mContext);
+                                }
                             }
                         }
                     }
@@ -238,42 +325,78 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
     }
 
     private static void readConfigOld(Context context) {
-        if (context == null) return;
-        try {
-            ContentResolver contentResolver = context.getContentResolver();
-            Uri uri = Uri.parse("content://com.xeasy.noticefix.provider.IconDataContentProvider");
-            Cursor query = contentResolver.query(uri, null, null, null);
-            if (query != null && query.moveToNext()) {
-                String globalConfig = query.getString(0);
-                String iconFunc = query.getString(1);
-                String libIconList = query.getString(2);
-                String customIconList = query.getString(3);
-                query.close();
+        boolean loaded = false;
+        if (context != null) {
+            try {
+                ContentResolver contentResolver = context.getContentResolver();
+                Uri uri = Uri.parse("content://com.xeasy.noticefix.provider.IconDataContentProvider");
+                Cursor query = contentResolver.query(uri, null, null, null);
+                if (query != null && query.moveToNext()) {
+                    String globalConfig = query.getString(0);
+                    String iconFunc = query.getString(1);
+                    String libIconList = query.getString(2);
+                    String customIconList = query.getString(3);
+                    query.close();
 
-                HookConstant.globalConfigDao = gson.fromJson(globalConfig, GlobalConfigDao.class);
-                Type type = new TypeToken<List<IconFuncDao.IconFuncStatus>>() {}.getType();
-                HookConstant.iconFuncStatuses = gson.fromJson(iconFunc, type);
-                if (HookConstant.iconFuncStatuses != null) {
-                    Collections.sort(HookConstant.iconFuncStatuses);
+                    HookConstant.globalConfigDao = gson.fromJson(globalConfig, GlobalConfigDao.class);
+                    Type type = new TypeToken<List<IconFuncDao.IconFuncStatus>>() {}.getType();
+                    HookConstant.iconFuncStatuses = gson.fromJson(iconFunc, type);
+                    if (HookConstant.iconFuncStatuses != null) {
+                        Collections.sort(HookConstant.iconFuncStatuses);
+                    }
+                    Type type2 = new TypeToken<Map<String, IconLibBean>>() {}.getType();
+                    HookConstant.iconLibBeanMap = gson.fromJson(libIconList, type2);
+                    Type type3 = new TypeToken<Map<String, CustomIconBean>>() {}.getType();
+                    HookConstant.customIconBeanMap = gson.fromJson(customIconList, type3);
+                    loaded = true;
                 }
-                Type type2 = new TypeToken<Map<String, IconLibBean>>() {}.getType();
-                HookConstant.iconLibBeanMap = gson.fromJson(libIconList, type2);
-                Type type3 = new TypeToken<Map<String, CustomIconBean>>() {}.getType();
-                HookConstant.customIconBeanMap = gson.fromJson(customIconList, type3);
+            } catch (Exception ignored) {
             }
-        } catch (Exception ignored) {
+        }
+
+        // 开机时序兜底：当 ContentProvider 尚未就绪时，优先从 XSharedPreferences 兜底载入
+        if (!loaded && (HookConstant.globalConfigDao == null || !HookConstant.globalConfigDao.read)) {
+            try {
+                XSharedPreferences xsp = new XSharedPreferences("com.xeasy.noticefix", "global_config_file");
+                xsp.reload();
+                String globalConfig = xsp.getString("global_config_file", null);
+                if (globalConfig != null && !globalConfig.trim().isEmpty()) {
+                    HookConstant.globalConfigDao = gson.fromJson(globalConfig, GlobalConfigDao.class);
+                    if (HookConstant.globalConfigDao != null) {
+                        HookConstant.globalConfigDao.read = true;
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
+        // 终极安全防线：开机未就绪状态下，默认保持跳过灰度与放行系统
+        if (HookConstant.globalConfigDao == null) {
+            HookConstant.globalConfigDao = new GlobalConfigDao();
+            HookConstant.globalConfigDao.skipGrayscale = true;
+            HookConstant.globalConfigDao.showColoredIcons = true;
+            HookConstant.globalConfigDao.alwaysHandleProxyNotice = true;
         }
     }
 
     public static void fixNotificationIcon(StatusBarNotification statusBarNotification, Context context) {
         try {
-            Notification notification = statusBarNotification.getNotification();
             String packageName = statusBarNotification.getPackageName();
+
+            // 1. 系统核心包名绝对防御
+            if (isSystemPackage(packageName)) {
+                return;
+            }
+            String opPkg = statusBarNotification.getOpPkg();
+            if (isSystemPackage(opPkg)) {
+                return;
+            }
+
+            Notification notification = statusBarNotification.getNotification();
 
             CustomIconBean customIconBean = HookConstant.customIconBeanMap != null ? HookConstant.customIconBeanMap.get(packageName) : null;
             if (customIconBean != null && customIconBean.noHandle) {
-                String opPkg = statusBarNotification.getOpPkg();
-                boolean isProxy = !opPkg.equals(packageName);
+                boolean isProxy = opPkg != null && !opPkg.equals(packageName);
                 if (!isProxy || (HookConstant.globalConfigDao != null && !HookConstant.globalConfigDao.alwaysHandleProxyNotice)) {
                     return;
                 }
@@ -300,7 +423,6 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
 
             for (IconFuncDao.IconFuncStatus iconFuncStatus : HookConstant.iconFuncStatuses) {
                 if (iconFuncStatus.active) {
-                    // 1. 图标库分支：强制单色剪影化
                     if (iconFuncStatus.iconFuncId == IconFunc.LIB_FIX.funcId) {
                         IconLibBean iconLibBean = HookConstant.iconLibBeanMap != null ? HookConstant.iconLibBeanMap.get(packageName) : null;
                         if (iconLibBean != null) {
@@ -318,7 +440,6 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                             }
                         }
                     }
-                    // 2. 自定义图标分支：强制单色剪影化
                     if (iconFuncStatus.iconFuncId == IconFunc.CUSTOM_FIX.funcId) {
                         if (customIconBean != null && customIconBean.iconBase64 != null && !customIconBean.iconBase64.isEmpty()) {
                             Bitmap raw = ImageTools.base64ToBitmap(customIconBean.iconBase64);
@@ -332,7 +453,6 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                             }
                         }
                     }
-                    // 3. 算法分支
                     if (iconFuncStatus.iconFuncId == IconFunc.AUTO_FIX.funcId) {
                         Bitmap bitmap = getBitmap4Icon(smallIcon, context);
                         if (!new ImageUtils().isGrayscale(bitmap)) {
