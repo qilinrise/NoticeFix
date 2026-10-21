@@ -8,6 +8,7 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.content.ContentResolver;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -18,6 +19,7 @@ import android.net.Uri;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 import android.util.LruCache;
+import android.view.View;
 import android.widget.RemoteViews;
 
 import com.google.gson.reflect.TypeToken;
@@ -57,7 +59,7 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
     private static long sLastReadConfigTime = 0;
 
     /**
-     * 系统包名判定（核心防御：系统核心通知永不处理，绝不误伤原生底衬）
+     * 判断是否为系统核心包名（仅拦截系统框架与底层，绝不误伤普通第三方应用）
      */
     public static boolean isSystemPackage(String packageName) {
         if (packageName == null || packageName.trim().isEmpty()) {
@@ -67,6 +69,38 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                 || "com.android.systemui".equals(packageName)
                 || "com.google.android.systemui".equals(packageName)
                 || packageName.startsWith("com.android.internal");
+    }
+
+    /**
+     * 从 Notification.Builder 与 RemoteViews 中提取真实的源应用包名
+     */
+    private static String getRealPackageName(Object builder, RemoteViews rv) {
+        if (builder != null) {
+            try {
+                Notification n = (Notification) XposedHelpers.getObjectField(builder, "mNotification");
+                if (n != null && n.extras != null) {
+                    ApplicationInfo ai = n.extras.getParcelable("android.appInfo");
+                    if (ai != null && ai.packageName != null && !ai.packageName.isEmpty()) {
+                        return ai.packageName;
+                    }
+                    String extraPkg = n.extras.getString("android.substName");
+                    if (extraPkg != null && !extraPkg.isEmpty()) {
+                        return extraPkg;
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        if (rv != null) {
+            try {
+                String rvPkg = rv.getPackage();
+                if (rvPkg != null && !rvPkg.isEmpty() && !"com.android.systemui".equals(rvPkg)) {
+                    return rvPkg;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return null;
     }
 
     private static Context getContextFromBuilder(Object builder) {
@@ -156,6 +190,25 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
             XposedBridge.hookMethod(methodsByExactParameters, new XC_MethodHook() {
                 @Override
                 protected void afterHookedMethod(MethodHookParam param) {
+                    try {
+                        Object entry = param.args[0];
+                        View iconView = (View) param.args[2];
+                        if (entry != null && iconView != null) {
+                            StatusBarNotification sbn = (StatusBarNotification) ReflexUtil.getField4ObjByClass(entry.getClass(), entry, StatusBarNotification.class);
+                            if (sbn != null) {
+                                String pkg = sbn.getPackageName();
+                                // 核心修复 1：针对非系统应用的 Hook 图标，补齐 pre_L 比例标记，状态栏按 100% 原始尺寸渲染，不再强制压小
+                                if (!isSystemPackage(pkg)) {
+                                    @SuppressLint("DiscouragedApi")
+                                    int icon_is_pre_L = AndroidAppHelper.currentApplication().getResources().getIdentifier("icon_is_pre_L", "id", "com.android.systemui");
+                                    if (icon_is_pre_L != 0) {
+                                        iconView.setTag(icon_is_pre_L, true);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Throwable ignored) {
+                    }
                 }
             });
         }
@@ -166,25 +219,25 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                 new XC_MethodHook() {
                     @Override
                     protected void beforeHookedMethod(MethodHookParam param) {
-                        Context context = getContextFromBuilder(param.thisObject);
-                        String pkgName = context != null ? context.getPackageName() : null;
+                        String realPkg = getRealPackageName(param.thisObject, (RemoteViews) param.args[1]);
 
-                        // 1. 系统底层包（android / systemui）直接放行，完整保留系统深色圆形底衬
-                        if (isSystemPackage(pkgName)) {
+                        // 1. 系统核心包（如 android 原生电量）直接放行，保留其原生深色圆底
+                        if (isSystemPackage(realPkg)) {
                             return;
                         }
 
-                        // 2. 检查用户是否单独配置了“不处理此应用”
-                        if (pkgName != null && HookConstant.customIconBeanMap != null) {
-                            CustomIconBean customIconBean = HookConstant.customIconBeanMap.get(pkgName);
+                        // 2. 检查应用是否设为不处理
+                        if (realPkg != null && HookConstant.customIconBeanMap != null) {
+                            CustomIconBean customIconBean = HookConstant.customIconBeanMap.get(realPkg);
                             if (customIconBean != null && customIconBean.noHandle) {
                                 return;
                             }
                         }
 
-                        // 3. 跳过灰度图标配置：若检测到单色矢量图标，保留原生底衬与着色
+                        // 3. 跳过灰度矢量图标
                         if (HookConstant.globalConfigDao != null && HookConstant.globalConfigDao.skipGrayscale) {
                             Icon icon = (Icon) param.args[0];
+                            Context context = getContextFromBuilder(param.thisObject);
                             if (icon != null && context != null) {
                                 try {
                                     Bitmap bitmap = getBitmap4Icon(icon, context);
@@ -196,7 +249,7 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                             }
                         }
 
-                        // 仅对未适配的彩色应用剔除系统着色
+                        // 4. 针对需处理的彩色通知剥除原生滤镜
                         if (HookConstant.globalConfigDao != null && HookConstant.globalConfigDao.read && HookConstant.globalConfigDao.showColoredIcons) {
                             RemoteViews contentView = (RemoteViews) param.args[1];
                             if (contentView != null) {
@@ -208,43 +261,24 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
 
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) {
-                        // 若 before 中未拦截（被放行），after 不执行任何去底衬操作
                         if (!param.hasThrowable() && param.getResult() == null) {
                             return;
                         }
 
-                        Context context = getContextFromBuilder(param.thisObject);
-                        String pkgName = context != null ? context.getPackageName() : null;
-
-                        if (isSystemPackage(pkgName)) {
+                        String realPkg = getRealPackageName(param.thisObject, (RemoteViews) param.args[1]);
+                        if (isSystemPackage(realPkg)) {
                             return;
-                        }
-
-                        if (pkgName != null && HookConstant.customIconBeanMap != null) {
-                            CustomIconBean customIconBean = HookConstant.customIconBeanMap.get(pkgName);
-                            if (customIconBean != null && customIconBean.noHandle) {
-                                return;
-                            }
-                        }
-
-                        if (HookConstant.globalConfigDao != null && HookConstant.globalConfigDao.skipGrayscale) {
-                            Icon icon = (Icon) param.args[0];
-                            if (icon != null && context != null) {
-                                try {
-                                    Bitmap bitmap = getBitmap4Icon(icon, context);
-                                    if (bitmap != null && new ImageUtils().isGrayscale(bitmap)) {
-                                        return;
-                                    }
-                                } catch (Throwable ignored) {
-                                }
-                            }
                         }
 
                         if (HookConstant.globalConfigDao != null && HookConstant.globalConfigDao.read && HookConstant.globalConfigDao.showColoredIcons) {
                             RemoteViews contentView = (RemoteViews) param.args[1];
                             if (contentView != null) {
+                                // 移除原生底衬
                                 contentView.setInt(android.R.id.icon, "setBackgroundResource", android.R.color.transparent);
+
+                                // 核心修复 2：彻底清除默认 padding，让卡片图标填满容器，比例瞬间饱满
                                 contentView.setViewPadding(android.R.id.icon, 0, 0, 0, 0);
+
                                 @SuppressLint("DiscouragedApi")
                                 int left_icon = AndroidAppHelper.currentApplication().getResources().getIdentifier("left_icon", "id", "com.android.systemui");
                                 if (left_icon != 0) {
@@ -354,13 +388,12 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
             }
         }
 
-        // 开机时序兜底：当 ContentProvider 尚未就绪时，优先从 XSharedPreferences 兜底载入
         if (!loaded && (HookConstant.globalConfigDao == null || !HookConstant.globalConfigDao.read)) {
             try {
                 XSharedPreferences xsp = new XSharedPreferences("com.xeasy.noticefix", "global_config_file");
                 xsp.reload();
                 String globalConfig = xsp.getString("global_config_file", null);
-                if (globalConfig != null && !globalConfig.trim().isEmpty()) {
+                                if (globalConfig != null && !globalConfig.trim().isEmpty()) {
                     HookConstant.globalConfigDao = gson.fromJson(globalConfig, GlobalConfigDao.class);
                     if (HookConstant.globalConfigDao != null) {
                         HookConstant.globalConfigDao.read = true;
@@ -370,7 +403,6 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
             }
         }
 
-        // 终极安全防线：开机未就绪状态下，默认保持跳过灰度与放行系统
         if (HookConstant.globalConfigDao == null) {
             HookConstant.globalConfigDao = new GlobalConfigDao();
             HookConstant.globalConfigDao.skipGrayscale = true;
@@ -383,7 +415,6 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
         try {
             String packageName = statusBarNotification.getPackageName();
 
-            // 1. 系统核心包名绝对防御
             if (isSystemPackage(packageName)) {
                 return;
             }
