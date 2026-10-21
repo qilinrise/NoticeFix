@@ -382,7 +382,9 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                     HookConstant.globalConfigDao = gson.fromJson(globalConfig, GlobalConfigDao.class);
                     if (HookConstant.globalConfigDao != null) {
                         HookConstant.globalConfigDao.read = true;
-                    }            } catch (Throwable ignored) {
+                    }
+                }
+            } catch (Throwable ignored) {
             }
         }
 
@@ -516,5 +518,3 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
         return null;
     }
 }
-
-           
