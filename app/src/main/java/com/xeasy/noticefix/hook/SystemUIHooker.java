@@ -383,16 +383,17 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
 
                     HookConstant.globalConfigDao = gson.fromJson(globalConfig, GlobalConfigDao.class);
 
-                    Type typeIconFunc = new TypeToken<List<IconFuncDao.IconFuncStatus>>() {}.getType();
+                    // 使用 getParameterized 完全消除泛型尖括号，彻底规避手机剪贴板吞代码导致的语法错误
+                    Type typeIconFunc = TypeToken.getParameterized(List.class, IconFuncDao.IconFuncStatus.class).getType();
                     HookConstant.iconFuncStatuses = gson.fromJson(iconFunc, typeIconFunc);
                     if (HookConstant.iconFuncStatuses != null) {
                         Collections.sort(HookConstant.iconFuncStatuses);
                     }
 
-                    Type typeLib = new TypeToken>() {}.getType();
+                    Type typeLib = TypeToken.getParameterized(Map.class, String.class, IconLibBean.class).getType();
                     HookConstant.iconLibBeanMap = gson.fromJson(libIconList, typeLib);
 
-                    Type typeCustom = new TypeToken>() {}.getType();
+                    Type typeCustom = TypeToken.getParameterized(Map.class, String.class, CustomIconBean.class).getType();
                     HookConstant.customIconBeanMap = gson.fromJson(customIconList, typeCustom);
                     loaded = true;
                 }
