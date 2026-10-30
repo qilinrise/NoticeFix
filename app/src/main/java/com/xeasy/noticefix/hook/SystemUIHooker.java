@@ -103,9 +103,6 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
         }
     }
 
-    /**
-     * 检测图标是否为标准单色/灰度图标（如 ChatGPT、Gmail、Telegram）
-     */
     public static boolean isGrayscaleIcon(Icon icon, Context context, String pkgName) {
         if (icon == null) return false;
         try {
@@ -218,7 +215,6 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                                                 && HookConstant.globalConfigDao.read 
                                                 && HookConstant.globalConfigDao.showColoredIcons;
 
-                                        // 核心修复 1：单色规范图标（如 ChatGPT）禁止打 pre_L 标记，交由系统 DarkIconDispatcher 自动黑白反色
                                         boolean isGrayscale = false;
                                         if (sbn.getNotification() != null && sbn.getNotification().getSmallIcon() != null) {
                                             isGrayscale = isGrayscaleIcon(sbn.getNotification().getSmallIcon(), iconView.getContext(), pkg);
@@ -254,7 +250,6 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                             }
                         }
 
-                        // 核心修复 2：ChatGPT 等单色灰度图标直接放行，完整保留原生通知卡片着色
                         Icon icon = (Icon) param.args[0];
                         Context context = getContextFromBuilder(param.thisObject);
                         if (isGrayscaleIcon(icon, context, realPkg)) {
@@ -387,15 +382,18 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                     query.close();
 
                     HookConstant.globalConfigDao = gson.fromJson(globalConfig, GlobalConfigDao.class);
-                    Type type = new TypeToken<List<IconFuncDao.IconFuncStatus>>() {}.getType();
-                    HookConstant.iconFuncStatuses = gson.fromJson(iconFunc, type);
+
+                    Type typeIconFunc = new TypeToken<List<IconFuncDao.IconFuncStatus>>() {}.getType();
+                    HookConstant.iconFuncStatuses = gson.fromJson(iconFunc, typeIconFunc);
                     if (HookConstant.iconFuncStatuses != null) {
                         Collections.sort(HookConstant.iconFuncStatuses);
                     }
-                    Type type2 = new TypeToken>() {}.getType();
-                    HookConstant.iconLibBeanMap = gson.fromJson(libIconList, type2);
-                    Type type3 = new TypeToken>() {}.getType();
-                    HookConstant.customIconBeanMap = gson.fromJson(customIconList, type3);
+
+                    Type typeLib = new TypeToken>() {}.getType();
+                    HookConstant.iconLibBeanMap = gson.fromJson(libIconList, typeLib);
+
+                    Type typeCustom = new TypeToken>() {}.getType();
+                    HookConstant.customIconBeanMap = gson.fromJson(customIconList, typeCustom);
                     loaded = true;
                 }
             } catch (Exception ignored) {
@@ -456,7 +454,6 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
 
             Icon smallIcon = notification.getSmallIcon();
 
-            // 核心修复 3：若是 ChatGPT 这类原生单色规范应用，直接 return 退出，严禁破坏其原生变色逻辑
             if (!isProxy && isGrayscaleIcon(smallIcon, context, packageName)) {
                 return;
             }
