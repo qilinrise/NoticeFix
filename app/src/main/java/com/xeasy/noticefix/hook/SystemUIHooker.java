@@ -11,6 +11,7 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.Icon;
@@ -100,6 +101,28 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
         } catch (Throwable ignored) {
             return null;
         }
+    }
+
+    /**
+     * 检测图标是否为标准单色/灰度图标（如 ChatGPT、Gmail、Telegram）
+     */
+    public static boolean isGrayscaleIcon(Icon icon, Context context, String pkgName) {
+        if (icon == null) return false;
+        try {
+            Context targetContext = context;
+            if (context != null && pkgName != null && !context.getPackageName().equals(pkgName)) {
+                try {
+                    targetContext = context.createPackageContext(pkgName, Context.CONTEXT_IGNORE_SECURITY);
+                } catch (Throwable ignored) {
+                }
+            }
+            Bitmap bitmap = getBitmap4Icon(icon, targetContext != null ? targetContext : context);
+            if (bitmap != null) {
+                return new ImageUtils().isGrayscale(bitmap);
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
     }
 
     @Override
@@ -194,7 +217,14 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                                         boolean shouldShowColor = HookConstant.globalConfigDao != null 
                                                 && HookConstant.globalConfigDao.read 
                                                 && HookConstant.globalConfigDao.showColoredIcons;
-                                        iconView.setTag(icon_is_pre_L, shouldShowColor);
+
+                                        // 核心修复 1：单色规范图标（如 ChatGPT）禁止打 pre_L 标记，交由系统 DarkIconDispatcher 自动黑白反色
+                                        boolean isGrayscale = false;
+                                        if (sbn.getNotification() != null && sbn.getNotification().getSmallIcon() != null) {
+                                            isGrayscale = isGrayscaleIcon(sbn.getNotification().getSmallIcon(), iconView.getContext(), pkg);
+                                        }
+
+                                        iconView.setTag(icon_is_pre_L, shouldShowColor && !isGrayscale);
                                     }
                                 }
                             }
@@ -224,18 +254,11 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                             }
                         }
 
-                        if (HookConstant.globalConfigDao != null && HookConstant.globalConfigDao.skipGrayscale) {
-                            Icon icon = (Icon) param.args[0];
-                            Context context = getContextFromBuilder(param.thisObject);
-                            if (icon != null && context != null) {
-                                try {
-                                    Bitmap bitmap = getBitmap4Icon(icon, context);
-                                    if (bitmap != null && new ImageUtils().isGrayscale(bitmap)) {
-                                        return;
-                                    }
-                                } catch (Throwable ignored) {
-                                }
-                            }
+                        // 核心修复 2：ChatGPT 等单色灰度图标直接放行，完整保留原生通知卡片着色
+                        Icon icon = (Icon) param.args[0];
+                        Context context = getContextFromBuilder(param.thisObject);
+                        if (isGrayscaleIcon(icon, context, realPkg)) {
+                            return;
                         }
 
                         if (HookConstant.globalConfigDao != null && HookConstant.globalConfigDao.read && HookConstant.globalConfigDao.showColoredIcons) {
@@ -255,6 +278,12 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
 
                         String realPkg = getRealPackageName(param.thisObject, (RemoteViews) param.args[1]);
                         if (isSystemPackage(realPkg)) {
+                            return;
+                        }
+
+                        Icon icon = (Icon) param.args[0];
+                        Context context = getContextFromBuilder(param.thisObject);
+                        if (isGrayscaleIcon(icon, context, realPkg)) {
                             return;
                         }
 
@@ -363,9 +392,9 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                     if (HookConstant.iconFuncStatuses != null) {
                         Collections.sort(HookConstant.iconFuncStatuses);
                     }
-                    Type type2 = new TypeToken<Map<String, IconLibBean>>() {}.getType();
+                    Type type2 = new TypeToken>() {}.getType();
                     HookConstant.iconLibBeanMap = gson.fromJson(libIconList, type2);
-                    Type type3 = new TypeToken<Map<String, CustomIconBean>>() {}.getType();
+                    Type type3 = new TypeToken>() {}.getType();
                     HookConstant.customIconBeanMap = gson.fromJson(customIconList, type3);
                     loaded = true;
                 }
@@ -404,7 +433,6 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
             }
 
             String opPkg = statusBarNotification.getOpPkg();
-            // 核心修复 1：严格重构代理推送判定
             boolean isProxy = (opPkg != null && !opPkg.equals(packageName))
                     || "com.huawei.hwid".equals(opPkg)
                     || "com.huawei.hwid".equals(packageName);
@@ -413,7 +441,6 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
 
             CustomIconBean customIconBean = HookConstant.customIconBeanMap != null ? HookConstant.customIconBeanMap.get(packageName) : null;
             if (customIconBean != null && customIconBean.noHandle) {
-                // 如果用户对该应用开启了“不处理”，但这是一条代理推送且开启了“始终处理推送消息”，则强制放行处理；否则拦截
                 if (!isProxy || !alwaysHandle) {
                     return;
                 }
@@ -429,22 +456,15 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
 
             Icon smallIcon = notification.getSmallIcon();
 
-            // 核心修复 2：针对代理推送（如 HMS），不跳过灰度检测，强制让算法提取单色剪影
-            if (!isProxy && HookConstant.globalConfigDao != null && HookConstant.globalConfigDao.skipGrayscale) {
-                try {
-                    Bitmap bitmap = getBitmap4Icon(smallIcon, context);
-                    if (bitmap != null && new ImageUtils().isGrayscale(bitmap)) {
-                        return;
-                    }
-                } catch (Exception ignored) {
-                }
+            // 核心修复 3：若是 ChatGPT 这类原生单色规范应用，直接 return 退出，严禁破坏其原生变色逻辑
+            if (!isProxy && isGrayscaleIcon(smallIcon, context, packageName)) {
+                return;
             }
 
             if (HookConstant.iconFuncStatuses == null) return;
 
             for (IconFuncDao.IconFuncStatus iconFuncStatus : HookConstant.iconFuncStatuses) {
                 if (iconFuncStatus.active) {
-                    // 图标库分支
                     if (iconFuncStatus.iconFuncId == IconFunc.LIB_FIX.funcId) {
                         IconLibBean iconLibBean = HookConstant.iconLibBeanMap != null ? HookConstant.iconLibBeanMap.get(packageName) : null;
                         if (iconLibBean != null) {
@@ -462,7 +482,6 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                             }
                         }
                     }
-                    // 自定义图标分支
                     if (iconFuncStatus.iconFuncId == IconFunc.CUSTOM_FIX.funcId) {
                         if (customIconBean != null && customIconBean.iconBase64 != null && !customIconBean.iconBase64.isEmpty()) {
                             Bitmap raw = ImageTools.base64ToBitmap(customIconBean.iconBase64);
@@ -476,7 +495,6 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
                             }
                         }
                     }
-                    // 算法提取分支（核心修复 3：针对 HMS 传过来的全彩桌面位图，提取为规范单色剪影）
                     if (iconFuncStatus.iconFuncId == IconFunc.AUTO_FIX.funcId) {
                         Bitmap bitmap = getBitmap4Icon(smallIcon, context);
                         if (bitmap != null) {
@@ -495,13 +513,18 @@ public class SystemUIHooker implements IXposedHookLoadPackage {
         }
     }
 
-    // 核心修复 4：通过系统标准 Drawable API 解析各类位图与矢量图，彻底兼容 HMS 传入的自适应位图
     private static Bitmap getBitmap4Icon(Icon smallIcon, Context context) {
         if (smallIcon == null || context == null) return null;
         try {
             Drawable drawable = smallIcon.loadDrawable(context);
             if (drawable != null) {
-                return ImageTools.toBitmap(drawable);
+                int w = drawable.getIntrinsicWidth() > 0 ? drawable.getIntrinsicWidth() : 96;
+                int h = drawable.getIntrinsicHeight() > 0 ? drawable.getIntrinsicHeight() : 96;
+                Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+                Canvas canvas = new Canvas(bitmap);
+                drawable.setBounds(0, 0, w, h);
+                drawable.draw(canvas);
+                return bitmap;
             }
         } catch (Throwable ignored) {
         }
